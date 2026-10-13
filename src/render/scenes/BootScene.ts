@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { ASSETS } from '../assets/manifest';
-import type { MatchStartData } from '../context';
+export const BOOT_READY = 'boot-ready';
 
 /** Loads file assets and generates procedural placeholder textures, then starts the match. */
 export class BootScene extends Phaser.Scene {
@@ -14,13 +14,14 @@ export class BootScene extends Phaser.Scene {
     }
   }
 
-  create(data: MatchStartData): void {
+  create(): void {
     for (const a of ASSETS) {
       if ('generate' in a && !this.textures.exists(a.key)) {
         this.textures.addCanvas(a.key, a.generate());
       }
     }
     document.getElementById('loading')?.remove();
-    this.scene.start('World', data);
+    // The app (main.ts) shows the menu once shared assets exist.
+    this.game.events.emit(BOOT_READY);
   }
 }

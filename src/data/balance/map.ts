@@ -27,13 +27,13 @@ export const MAPGEN = {
   startForestRadius: 3,
   berryClusterSize: 5,
   /** Extra resources per half of the map (mirrored to the other half). */
-  extraGoldMines: 3,
+  extraGoldMines: 4,
   extraBerryClusters: 2,
   /** Minimum distance (tiles) between any two resource features. */
   featureSpacing: 4,
   /** Width (tiles) of the corridor carved if the bases are not connected. */
   corridorWidth: 2,
-  goldPerMine: 3000,
+  goldPerMine: 4000,
   foodPerBerryBush: 200,
   woodPerTree: 150,
 } as const;

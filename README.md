@@ -8,7 +8,7 @@ be wrapped with **Capacitor** for Android/iOS.
 All names, factions and art are original. See [PLAN.md](PLAN.md) for milestones and design
 decisions and [ARCHITECTURE.md](ARCHITECTURE.md) for how the code is organised.
 
-> Status: **M1** — project setup, PWA, procedural map, touch camera, fixed-timestep simulation.
+> Status: **M8 complete** — full single-player game: menus, tutorial, three factions, four ages, heroes, mythic units, god powers, AI (Easy/Normal/Hard), Norwegian and English. M9 (Capacitor/native) next.
 
 ## Requirements
 
@@ -27,7 +27,8 @@ Node 20+ (22 recommended) and npm.
 | `npm run e2e`     | Phone-viewport touch test of the build with Playwright (run `build` first) |
 | `npm run icons`   | Regenerate PWA PNG icons from `public/icons/icon.svg`                      |
 
-URL parameters for testing: `?seed=anyword&size=48` (map seed and size, 32–128).
+URL parameters for testing (skip the menus): `?play=1&seed=anyword&size=48&faction=aurelian&god=thalassine&ai=hard`,
+or `?tutorial=1`. Without parameters the game opens on the main menu.
 
 ## Playing on a phone
 
@@ -36,14 +37,35 @@ URL parameters for testing: `?seed=anyword&size=48` (map seed and size, 32–128
 - **Install:** open the deployed HTTPS URL → browser menu → _Add to Home Screen / Install app_.
   The game launches fullscreen in landscape and works offline after the first load.
 
-Controls: one finger drag = pan, pinch = zoom, tap = inspect (select/command from M2), double tap =
-quick zoom, long press = context ping. Mouse: drag + wheel.
+### Touch controls
+
+| Gesture                         | Action                                                         |
+| ------------------------------- | -------------------------------------------------------------- |
+| One-finger drag                 | Pan the camera (with momentum)                                 |
+| Pinch                           | Zoom                                                           |
+| Tap own unit/building           | Select it                                                      |
+| Tap ground / enemy / resource   | Move / attack / gather with the selection                      |
+| Tap own unfinished building     | Selected workers help build or repair                          |
+| Tap ground with a building sel. | Set its rally point (rally on a resource = new workers gather) |
+| Double-tap a unit               | Select all units of that type on screen                        |
+| Long-press then drag            | Box selection (or use the box button on the left)              |
+| Left buttons                    | Box-select mode · select idle workers · select whole army      |
+| Groups 1–5                      | Tap = select (tap again = jump to it), hold = assign           |
+| Hold any command button         | Show what it does / cancel one queued unit                     |
+| Minimap                         | Tap or drag to move the camera; red ping = attack, ⚠ = jump    |
+
+Mouse works too (drag, click, wheel to zoom).
 
 ## Deploying as a PWA
 
 `npm run build` produces a static site in `dist/` with relative paths, so it can be hosted from
 any folder on any static HTTPS host (GitHub Pages, Netlify, Cloudflare Pages, S3…). Just upload
 `dist/`. Each build gets a new cache name, so players get updates on the next launch.
+
+## Saving
+
+Settings and statistics are stored locally (`localStorage`). Saving a match in progress is not
+implemented yet (the deterministic command log makes it possible later; see ARCHITECTURE.md).
 
 ## Native apps (Capacitor)
 
@@ -71,8 +93,25 @@ terrain tileset must follow the layout in `src/render/assets/tileset.ts`.
 
 ## Adding a faction or unit
 
-Factions, units, buildings, gods and techs are data files in `src/data` (introduced in M2–M6;
-this section will list the exact steps once those files exist). Balance values never live in code.
+Everything is data in `src/data`; the simulation, UI and AI pick new entries up automatically.
+
+**A unit:** add a `UnitDef` to `src/data/units.ts` (stats, cost, `trainedAt` building, `age`,
+procedural `art` description; mythic units also need `god`). Add its name in both languages.
+
+**A god:** add a `GodDef` to `src/data/gods.ts` (bonuses as `Modifier`s, a `power` id from
+`src/data/powers.ts`, optional `mythic` unit / `tech`), then list it in its faction's
+`majorGods` or `minorGods[age]`.
+
+**A god power:** add a `PowerDef` to `src/data/powers.ts` using one of the existing kinds
+(`strike`, `dot`, `heal`, `freeze`, `slow`, `summon`, `boost`, `reveal`).
+
+**A faction:** add the id to `FactionId` in `src/data/types.ts`, a `FactionDef` to
+`src/data/factions.ts` (style colours, favor mode, bonuses, worker id, gods), a full roster
+(worker, infantry, ranged, cavalry, siege, hero, four mythic units) and its gods. Add an army mix
+in `src/data/ai.ts`. `npm test` validates every cross-reference (`tests/data.test.ts`).
+
+Balance numbers (gather rates, costs, counters in `src/data/counters.ts`, AI tuning in
+`src/data/ai.ts`) never live in code. Use `npm run balance` to see how changes play out.
 
 ## Project layout
 

@@ -42,6 +42,9 @@ export class Simulation {
   /** Commands applied so far, in order — enough to replay the match from its config. */
   readonly history: ScheduledCommand[] = [];
   readonly controllers: Controller[] = [];
+  /** When true, accumulate per-system time in `timings` (debugging only). */
+  profile = false;
+  readonly timings: Record<string, number> = {};
   /** Events produced since the last drain. */
   private eventBuffer: SimEvent[] = [];
 
@@ -64,7 +67,9 @@ export class Simulation {
       e.px = e.x;
       e.py = e.y;
     }
+    const tc = this.profile ? performance.now() : 0;
     for (const c of this.controllers) c.update(w, (cmd) => this.enqueue(cmd));
+    if (this.profile) this.timings.ai = (this.timings.ai ?? 0) + performance.now() - tc;
     if (this.pending.length > 0) {
       const due = this.pending.filter((c) => c.tick <= w.tick);
       this.pending = this.pending.filter((c) => c.tick > w.tick);
@@ -73,7 +78,16 @@ export class Simulation {
         this.history.push({ tick: w.tick, command: sc.command });
       }
     }
-    for (const system of this.systems) system(w);
+    if (this.profile) {
+      for (const system of this.systems) {
+        const t0 = performance.now();
+        system(w);
+        const k = system.name || 'system';
+        this.timings[k] = (this.timings[k] ?? 0) + performance.now() - t0;
+      }
+    } else {
+      for (const system of this.systems) system(w);
+    }
     cleanupDead(w);
     w.tick++;
     if (w.events.length) this.eventBuffer.push(...w.events);

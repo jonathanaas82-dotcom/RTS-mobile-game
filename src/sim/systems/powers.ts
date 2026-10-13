@@ -56,7 +56,7 @@ export function castPower(world: World, player: number, power: string, x: number
   if (d.radius <= 0) {
     // Untargeted: centre the visual on the player's first Town Hall.
     const hall = world.entities.find(
-      (e) => !e.dead && e.owner === player && buildingDef(e.def).main,
+      (e) => !e.dead && e.owner === player && e.kind === 'building' && buildingDef(e.def).main,
     );
     x = hall?.x ?? 0;
     y = hall?.y ?? 0;

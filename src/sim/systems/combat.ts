@@ -144,10 +144,23 @@ function engage(world: World, e: Entity, target: Entity, atk: AttackDef): void {
     if (e.cooldown <= 0) strike(world, e, target, atk);
     return;
   }
-  // Chase: repath periodically (targets move).
-  if (!isMoving(e) || world.tick >= e.repathAt) {
+  // Chase: repath only when idle or when the target has moved away from our current goal.
+  const drift = (target.x - e.goalX) ** 2 + (target.y - e.goalY) ** 2;
+  if (
+    (!isMoving(e) && world.tick >= e.repathAt) ||
+    (world.tick >= e.repathAt && drift > 1.5 * 1.5)
+  ) {
     e.repathAt = world.tick + RULES.chaseRepathTicks;
-    moveToEntity(e, target);
+    if (target.kind === 'unit' && isMoving(e) && e.path.length === 2) {
+      // Straight-line chase: just move the end point (no pathfinding needed).
+      e.path[0] = target.x;
+      e.path[1] = target.y;
+      e.pathIdx = 0;
+      e.goalX = target.x;
+      e.goalY = target.y;
+    } else {
+      moveToEntity(e, target);
+    }
   }
 }
 
@@ -155,9 +168,13 @@ function engage(world: World, e: Entity, target: Entity, atk: AttackDef): void {
 export function findEnemy(world: World, e: Entity, r: number, visibleTo?: number): Entity | null {
   let best: Entity | null = null;
   let bestScore = Infinity;
+  const reach = attackDefOf(e)?.range ?? 0;
   for (const o of world.spatial.query(e.x, e.y, r)) {
     if (!isEnemy(e, o)) continue;
     if (visibleTo !== undefined && !visibleFor(world, visibleTo, o)) continue;
+    // Ignore enemies we can neither reach on foot nor shoot from here.
+    if (e.kind === 'unit' && gap(e, o) > reach && !world.grid.connected(e.x, e.y, o.x, o.y))
+      continue;
     const d = (o.x - e.x) ** 2 + (o.y - e.y) ** 2;
     // Prefer fighting units over workers.
     const score = d + (o.cls === 'worker' ? 9 : 0);

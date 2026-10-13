@@ -9,9 +9,11 @@ import { FixedStepLoop } from '../../sim/core/loop';
 import type { Entity } from '../../sim/entity';
 import type { Simulation } from '../../sim/simulation';
 import { createMatch } from '../../game/match';
+import { Tutorial } from '../../ui/tutorial';
+import { spawnUnit } from '../../sim/world';
 import type { AIController } from '../../ai/AIController';
 import { canAdvance, nextAge } from '../../sim/rules';
-import type { World } from '../../sim/world';
+import type { SimEvent, World } from '../../sim/world';
 import { CommandCard, costText, denialText, powerIcon } from '../../ui/commandCard';
 import { GestureRecognizer, type GestureEvent } from '../../ui/input/gestures';
 import { MatchArt } from '../assets/matchArt';
@@ -61,6 +63,10 @@ export class WorldScene extends Phaser.Scene {
   private minimap!: Minimap;
   private nextMinimapAt = 0;
   private gameOverShown = false;
+  /** Accumulated per-section frame time (ms) for the debug overlay / perf tests. */
+  readonly prof = { sim: 0, events: 0, fx: 0, mini: 0, ents: 0, hud: 0, n: 0 };
+  private tutorial: Tutorial | null = null;
+  private nextTutorialAt = 0;
 
   constructor() {
     super('World');
@@ -68,15 +74,16 @@ export class WorldScene extends Phaser.Scene {
 
   create(data: MatchStartData): void {
     this.ctx = this.registry.get(CONTEXT_KEY) as AppContext;
-    const m = createMatch(data);
+    const m = createMatch(data.config);
     this.sim = m.sim;
     this.ais = m.ais;
+    this.gameOverShown = false;
     this.loop = new FixedStepLoop({
       stepMs: TICK_MS,
       maxStepsPerFrame: SIM.maxStepsPerFrame,
       onStep: () => this.sim.step(),
     });
-    this.art = new MatchArt(this.textures, data.players);
+    this.art = new MatchArt(this.textures, data.config.players);
     this.buildTerrain();
     this.entities = new EntityRenderer(this, this.art);
     this.fx = new EffectsRenderer(this, this.art);
@@ -89,9 +96,17 @@ export class WorldScene extends Phaser.Scene {
     this.setupInput();
     this.exposeControls();
     this.ctx.hud.show(true);
+    this.ctx.hud.showModal(null);
+    this.ctx.hud.showBanner(null);
+    this.ctx.hud.onPauseChange(false);
+    this.ctx.hud.onSpeedChange(1);
     this.refreshHud(true);
+    this.tutorial = data.tutorial ? this.createTutorial() : null;
+    this.ctx.sfx.music('peace');
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.pointer.destroy();
+      this.tutorial?.destroy();
+      this.tutorial = null;
       this.ctx.match = null;
     });
   }
@@ -217,7 +232,7 @@ export class WorldScene extends Phaser.Scene {
           { move: 0x7cf29c, attack: 0xff5a5a, gather: 0xffd166, build: 0xf0cf72 }[kind],
         ),
       ghost: (def, tx, ty, ok) => this.ghost(def, tx ?? 0, ty ?? 0, ok ?? false),
-      sound: () => undefined,
+      sound: (name) => this.ctx.sfx.play(name),
       haptic: (ms) => {
         if (this.ctx.settings.haptics) haptic(ms ?? 15);
       },
@@ -336,25 +351,7 @@ export class WorldScene extends Phaser.Scene {
         this.ctx.hud.onSpeedChange(s);
       },
       getSpeed: () => this.loop.speed,
-      openMenu: () => {
-        this.loop.paused = true;
-        this.ctx.hud.onPauseChange(true);
-        this.ctx.hud.showModal({
-          title: t('hud.paused'),
-          body: this.pantheonText(),
-          actions: [
-            {
-              label: t('hud.resume'),
-              primary: true,
-              onPress: () => {
-                this.ctx.hud.showModal(null);
-                this.loop.paused = false;
-                this.ctx.hud.onPauseChange(false);
-              },
-            },
-          ],
-        });
-      },
+      openMenu: () => this.openPauseMenu(),
       toggleBoxMode: () => this.input2.toggleBoxMode(),
       selectIdleWorkers: () => {
         const idle = this.input2.selectIdleWorkers();
@@ -388,6 +385,150 @@ export class WorldScene extends Phaser.Scene {
         if (this.alertPos) this.centerOnTile(this.alertPos.x, this.alertPos.y);
       },
     };
+  }
+
+  /** Average ms per frame per section since the last call (then resets). */
+  profText(): string {
+    const p = this.prof;
+    const n = Math.max(1, p.n);
+    const f = (v: number): string => (v / n).toFixed(1);
+    const txt = `ms/frame sim ${f(p.sim)} ev ${f(p.events)} fx ${f(p.fx)} map ${f(p.mini)} ents ${f(p.ents)} hud ${f(p.hud)}`;
+    p.sim = p.events = p.fx = p.mini = p.ents = p.hud = p.n = 0;
+    return txt;
+  }
+
+  /** Map sim events to sound effects (only for things the player can perceive). */
+  private soundFor(ev: SimEvent): void {
+    const sfx = this.ctx.sfx;
+    const onScreen = (x: number, y: number): boolean =>
+      this.fogAt(x, y) === 2 && this.cameras.main.worldView.contains(x * TILE_PX, y * TILE_PX);
+    switch (ev.type) {
+      case 'hit':
+        if (onScreen(ev.x, ev.y)) sfx.play('hit', 0.6);
+        break;
+      case 'attack':
+        if (ev.ranged) {
+          const e = this.world.byId.get(ev.id);
+          if (e && onScreen(e.x, e.y)) sfx.play('arrow', 0.6);
+        }
+        break;
+      case 'death':
+        if (ev.kind !== 'resource' && onScreen(ev.x, ev.y))
+          sfx.play('death', ev.kind === 'building' ? 1 : 0.6);
+        break;
+      case 'built':
+        if (ev.owner === ME) sfx.play('built');
+        break;
+      case 'trained':
+        if (ev.owner === ME) sfx.play('trained', 0.7);
+        break;
+      case 'ageUp':
+        if (ev.owner === ME) sfx.play('ageUp');
+        break;
+      case 'power':
+        if (ev.owner === ME || this.fogAt(ev.x, ev.y) === 2) sfx.play('power');
+        break;
+      case 'underAttack':
+        if (ev.owner === ME) sfx.play('alert');
+        break;
+      case 'error':
+        if (ev.owner === ME) sfx.play('error');
+        break;
+      case 'gameOver':
+        sfx.play(ev.winner === ME ? 'victory' : 'defeat');
+        sfx.music(ev.winner === ME ? 'victory' : null);
+        break;
+      default:
+        break;
+    }
+  }
+
+  private resume(): void {
+    this.ctx.hud.showModal(null);
+    this.loop.paused = false;
+    this.ctx.hud.onPauseChange(false);
+  }
+
+  private openPauseMenu(): void {
+    this.loop.paused = true;
+    this.ctx.hud.onPauseChange(true);
+    this.ctx.hud.showModal({
+      title: t('hud.paused'),
+      body: this.pantheonText(),
+      actions: [
+        { label: t('hud.resume'), primary: true, onPress: () => this.resume() },
+        {
+          label: t('pause.settings'),
+          onPress: () => {
+            this.ctx.hud.showModal(null);
+            this.ctx.openSettings?.(() => this.openPauseMenu());
+          },
+        },
+        {
+          label: t('pause.surrender'),
+          onPress: () =>
+            this.ctx.hud.showModal({
+              title: t('pause.confirmSurrender'),
+              actions: [
+                {
+                  label: t('pause.yes'),
+                  primary: true,
+                  onPress: () => {
+                    this.ctx.hud.showModal(null);
+                    this.loop.paused = false;
+                    this.issue({ type: 'resign', player: ME });
+                  },
+                },
+                { label: t('pause.no'), onPress: () => this.openPauseMenu() },
+              ],
+            }),
+        },
+        { label: t('pause.quit'), onPress: () => this.ctx.toMenu?.() },
+      ],
+    });
+  }
+
+  private createTutorial(): Tutorial {
+    return new Tutorial(
+      {
+        world: () => this.world,
+        me: ME,
+        selected: () => this.input2.selection.entities(this.world),
+        spawnEnemies: (n) => {
+          const w = this.world;
+          const hall = w.entities.find((e) => e.owner === ME && e.def === 'town_hall');
+          const enemy = w.config.players[1]!;
+          const worker = factionDef(enemy.faction).worker;
+          const cx = (hall?.x ?? w.map.width / 2) + 7;
+          const cy = (hall?.y ?? w.map.height / 2) + 5;
+          const ids: number[] = [];
+          for (let i = 0; i < n; i++) {
+            const u = spawnUnit(w, 1, worker, cx + i * 0.7, cy);
+            u.order = {
+              type: 'attackMove',
+              x: hall?.x ?? cx,
+              y: hall?.y ?? cy,
+              target: -1,
+              tile: -1,
+            };
+            u.needsPath = false;
+            ids.push(u.id);
+          }
+          this.centerOnTile(cx - 2, cy - 1);
+          return ids;
+        },
+        grant: (res) => {
+          const p = this.world.players[ME]!;
+          for (const k of Object.keys(res) as Array<'food' | 'wood' | 'gold'>)
+            p.res[k] += res[k] ?? 0;
+        },
+        finish: (toMenu) => {
+          this.tutorial = null;
+          if (toMenu) this.ctx.toMenu?.();
+        },
+      },
+      document.getElementById('hud') as HTMLElement,
+    );
   }
 
   /** Summary of the local player's faction, gods and powers (pause menu). */
@@ -498,7 +639,15 @@ export class WorldScene extends Phaser.Scene {
     this.gestures.update(performance.now());
     this.camModel.update(dt);
     this.applyCamera();
+    const pr = this.prof;
+    let tp = performance.now();
+    const lap = (k: keyof typeof pr): void => {
+      const now = performance.now();
+      pr[k] += now - tp;
+      tp = now;
+    };
     this.alpha = this.loop.advance(dt);
+    lap('sim');
     for (const ev of this.sim.drainEvents()) {
       this.fx.onEvent(
         ev,
@@ -506,6 +655,7 @@ export class WorldScene extends Phaser.Scene {
         (x, y) => this.fogAt(x, y) === 2,
         (x, y) => this.cameras.main.worldView.contains(x * TILE_PX, y * TILE_PX),
       );
+      this.soundFor(ev);
       if (ev.type === 'treeCut') {
         this.refreshTile(ev.tile);
         this.minimap.markDirty();
@@ -565,11 +715,17 @@ export class WorldScene extends Phaser.Scene {
         if (this.ctx.settings.haptics) haptic([40, 60, 40]);
       }
     }
+    lap('events');
     this.input2.update();
+    if (this.tutorial && time >= this.nextTutorialAt) {
+      this.nextTutorialAt = time + 400;
+      this.tutorial.update();
+    }
     this.fogR.update(this.world, ME);
     const vis = (x: number, y: number): boolean => this.fogAt(x, y) === 2;
     this.fx.update(this.world, this.alpha, vis);
     this.fx.drawAreas(this.world, vis, (power) => parseInt(powerDef(power).color.slice(1), 16));
+    lap('fx');
     if (time >= this.nextMinimapAt) {
       this.nextMinimapAt = time + 250;
       const v = this.cameras.main.worldView;
@@ -580,6 +736,7 @@ export class WorldScene extends Phaser.Scene {
         time,
       );
     }
+    lap('mini');
     this.entities.update(
       this.world,
       this.alpha,
@@ -588,7 +745,10 @@ export class WorldScene extends Phaser.Scene {
       (e) => this.isVisible(e),
       this.cameras.main.worldView,
     );
+    lap('ents');
     this.refreshHud();
+    lap('hud');
+    pr.n++;
 
     if (time >= this.nextStatsAt && this.ctx.settings.showDebug) {
       this.nextStatsAt = time + 250;
@@ -600,7 +760,7 @@ export class WorldScene extends Phaser.Scene {
         camTileX: this.camModel.centerX / TILE_PX,
         camTileY: this.camModel.centerY / TILE_PX,
         entities: this.world.entities.length,
-        extra: this.ais.map((a) => a.debugText()).join('\n'),
+        extra: [this.profText(), ...this.ais.map((a) => a.debugText())].join('\n'),
       });
     }
   }

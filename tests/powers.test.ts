@@ -96,6 +96,16 @@ describe('god powers', () => {
     );
   });
 
+  it('untargeted powers work when the player owns units before buildings in the list', () => {
+    const sim = newSim(58);
+    const p = grant(sim, 'bountiful');
+    // Units created before the town hall in entity order must not break the hall lookup.
+    sim.world.entities.unshift(sim.world.entities.pop()!);
+    sim.enqueue({ type: 'castPower', player: 0, power: 'bountiful', x: 0, y: 0 });
+    run(sim, 2);
+    expect(p.timed.length).toBe(1);
+  });
+
   it('reveal uncovers fog in the area', () => {
     const sim = newSim(56);
     grant(sim, 'farsight');
@@ -136,7 +146,7 @@ describe('favor income', () => {
             }
     }
     run(sim, 20 * 30);
-    expect(w.players[0]!.res.favor).toBeCloseTo(0.22 * 30, 0);
+    expect(w.players[0]!.res.favor).toBeCloseTo(0.18 * 30, 0);
     // Merit-Asha: +25% monument favor.
     expect(w.players[1]!.res.favor).toBeCloseTo(0.3 * 1.25 * 30, 0);
   });

@@ -33,9 +33,11 @@ export class Pathfinder {
   private heapF: Float64Array;
   private heapSize = 0;
   /** Expanded node budget per search. */
-  maxExpand = 5000;
+  maxExpand = 3000;
   /** Stats for the debug overlay / tests. */
   lastExpanded = 0;
+  /** Whether the last search reached its goal (false = partial path to the closest tile). */
+  lastFound = false;
 
   constructor(grid: Grid) {
     this.grid = grid;
@@ -113,6 +115,7 @@ export class Pathfinder {
       }
     }
     this.lastExpanded = expanded;
+    this.lastFound = found >= 0;
     const end = found >= 0 ? found : best;
     const path: number[] = [];
     for (let i = end; i !== start && i !== -1; i = this.parent[i] as number) path.push(i);

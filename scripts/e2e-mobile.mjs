@@ -257,7 +257,12 @@ try {
     return [hall.x, hall.y];
   });
   const [tx2, ty2] = await toScreen(hallPos[0], hallPos[1]);
-  await tapAt(tx2, ty2);
+  const hallSelected = () =>
+    page.evaluate(() => {
+      const s = window.__godforge.game.scene.getScene('World');
+      return s.input2.selection.entities(s.sim.world).some((e) => e.def === 'town_hall');
+    });
+  for (let attempt = 0; attempt < 4 && !(await hallSelected()); attempt++) await tapAt(tx2, ty2);
   const trainBtn = page.locator('.cmd-btn[data-key^="train:"]').first();
   check(await trainBtn.isVisible(), 'town hall shows a train button');
   await trainBtn.tap();
@@ -395,6 +400,69 @@ try {
   ]);
   check(scroll[0] === 0 && scroll[1] === 0 && scroll[2] === 1, 'page did not scroll or zoom');
 
+  // --- Performance: 160+ units on screen; measure our per-frame JS cost (scene update).
+  const perf = await page.evaluate(async () => {
+    const s = window.__godforge.game.scene.getScene('World');
+    const w = s.sim.world;
+    const cx = w.map.width / 2;
+    const cy = w.map.height / 2;
+    for (let i = 0; i < 90; i++) {
+      window.__godforge.spawn(
+        0,
+        'shieldbrother',
+        cx - 5 + (i % 10) * 0.55,
+        cy - 3 + Math.floor(i / 10) * 0.55,
+      );
+      window.__godforge.spawn(
+        1,
+        'lancer',
+        cx + 5 - (i % 10) * 0.55,
+        cy - 3 + Math.floor(i / 10) * 0.55,
+      );
+    }
+    for (let i = 0; i < w.fog[0].length; i++) w.fog[0][i] = 2;
+    s.camModel.zoom = (16 * s.ctx.renderScale) / 64;
+    s.centerOnTile(cx, cy);
+    // Time between the scene's pre-update and post-update events = our update() cost.
+    let total = 0;
+    let frames = 0;
+    let t0 = 0;
+    const pre = () => (t0 = performance.now());
+    const post = () => {
+      total += performance.now() - t0;
+      frames++;
+    };
+    s.profText();
+    s.sim.profile = true;
+    const tick0 = w.tick;
+    s.events.on('preupdate', pre);
+    s.events.on('postupdate', post);
+    await new Promise((r) => setTimeout(r, 3000));
+    s.events.off('preupdate', pre);
+    s.events.off('postupdate', post);
+    const ticks = w.tick - tick0;
+    s.sim.profile = false;
+    const sys = Object.entries(s.sim.timings)
+      .map(([k, v]) => `${k} ${(v / ticks).toFixed(2)}`)
+      .join(' ');
+    const prof = s.profText() + `\n  per tick (${ticks} ticks): ${sys}`;
+    return {
+      msPerFrame: total / frames,
+      frames,
+      prof,
+      units: w.entities.filter((e) => e.kind === 'unit').length,
+    };
+  });
+  console.log(`  ${perf.prof}`);
+  console.log(
+    `  render+sim JS per frame with ${perf.units} units: ${perf.msPerFrame.toFixed(2)} ms over ${perf.frames} frames (headless, software GL)`,
+  );
+  check(
+    perf.msPerFrame < 12,
+    `per-frame game logic stays within budget (${perf.msPerFrame.toFixed(2)} ms)`,
+  );
+  await page.screenshot({ path: `${OUT}/04c-crowd.png` });
+
   // --- Victory: wipe the enemy and expect the end-of-match screen, then restart.
   await page.evaluate(() => {
     const w = window.__godforge.game.scene.getScene('World').sim.world;
@@ -465,6 +533,59 @@ try {
     check(aiBusy, `AI opponent puts its workers to work (${f} game)`);
     await page.screenshot({ path: `${OUT}/06-${f}.png` });
   }
+
+  // --- M8: main menu -> pre-match -> battle -> quit; settings language; tutorial.
+  await page.goto(base);
+  await page.waitForSelector('.menu-main', { timeout: 20000 });
+  check(await page.locator('.menu-title').isVisible(), 'main menu shown on launch');
+  await page.screenshot({ path: `${OUT}/07-menu.png` });
+  await page.locator('.menu-main .menu-btn.primary').tap();
+  await page.waitForSelector('.menu-pre');
+  await page.locator('.pre-cards').first().locator('.pre-card').nth(2).tap(); // Sahrun
+  await page.waitForTimeout(150);
+  await page.locator('.segmented').first().locator('.seg-btn').nth(2).tap(); // Hard
+  await page.waitForTimeout(150);
+  check(
+    (await page.locator('.pre-note').textContent()).includes('15'),
+    'hard difficulty shows its explicit bonus',
+  );
+  await page.screenshot({ path: `${OUT}/08-prematch.png`, fullPage: true });
+  await page.locator('.menu-btn.start').tap();
+  await page.waitForFunction(() => window.__godforge?.ctx?.match != null, null, { timeout: 20000 });
+  const setup = await page.evaluate(() => {
+    const w = window.__godforge.game.scene.getScene('World').sim.world;
+    return { f: w.players[0].faction, ai: w.config.players[1].ai };
+  });
+  check(
+    setup.f === 'sahrun' && setup.ai === 'hard',
+    `pre-match choices apply (${JSON.stringify(setup)})`,
+  );
+  await page.locator('.hud-controls .hud-btn').first().tap();
+  await page.waitForTimeout(200);
+  await page.locator('.modal-actions button').last().tap(); // Quit to menu
+  await page.waitForSelector('.menu-main', { timeout: 5000 });
+  check(true, 'quit returns to the main menu');
+  // Settings: switch to Norwegian.
+  await page.locator('.menu-main .menu-btn').nth(2).tap();
+  await page.waitForSelector('.menu-settings');
+  await page.locator('.set-row').first().locator('.seg-btn').nth(1).tap();
+  await page.waitForTimeout(200);
+  const title = await page.locator('.menu-header h2').textContent();
+  check(title === 'Innstillinger', `language switches to Norwegian ("${title}")`);
+  await page.screenshot({ path: `${OUT}/09-settings-nb.png` });
+  await page.locator('.set-row').first().locator('.seg-btn').nth(0).tap();
+  await page.waitForTimeout(150);
+  await page.locator('.menu-back').tap();
+  await page.waitForSelector('.menu-main');
+  // Tutorial.
+  await page.locator('.menu-main .menu-btn').nth(1).tap();
+  await page.waitForSelector('.coach', { timeout: 20000 });
+  check(await page.locator('.coach').isVisible(), 'tutorial coach shown');
+  await page.locator('.coach .btn-primary').tap();
+  await page.waitForTimeout(300);
+  const step = await page.locator('.coach-step').textContent();
+  check(/2\//.test(step ?? ''), `tutorial advances (${step})`);
+  await page.screenshot({ path: `${OUT}/10-tutorial.png` });
 
   check(errors.length === 0, `no console errors${errors.length ? ': ' + errors.join(' | ') : ''}`);
 } catch (e) {

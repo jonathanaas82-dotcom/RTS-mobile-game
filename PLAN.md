@@ -10,13 +10,13 @@ original; real-world mythology is used only as loose public-domain inspiration.
 | #   | Scope                                                                                                                                                                                                                                             | Status  |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
 | M1  | Project setup (Vite, TS strict, ESLint/Prettier, Vitest), PWA (manifest, offline SW, landscape, no browser gestures), Phaser scene, procedural tile map, touch camera (pan / pinch / inertia), fixed-timestep sim loop, asset manifest, HUD shell | ✅ done |
-| M2  | Entities/ECS, units, tap/box/double-tap selection, move commands, A\* + flow fields, separation/avoidance with a spatial hash                                                                                                                     | next    |
-| M3  | Economy: gathering, drop-off, construction, houses/pop cap, training queues, command/build panels                                                                                                                                                 |         |
-| M4  | Combat, counter matrix, health bars, projectiles, fog of war, minimap, win/lose                                                                                                                                                                   |         |
-| M5  | Ages, minor god choice per age, tech tree, heroes                                                                                                                                                                                                 |         |
-| M6  | Favor (per-faction income mode), mythic units, god powers, the three factions fully data-driven                                                                                                                                                   |         |
-| M7  | AI opponent (utility AI + build orders), Easy/Normal/Hard, AI debug overlay                                                                                                                                                                       |         |
-| M8  | Menus, pre-match, tutorial, settings, i18n (nb/en) completion, audio, polish, performance + balance pass                                                                                                                                          |         |
+| M2  | Entities/ECS, units, tap/box/double-tap selection, move commands, A\* + flow fields, separation/avoidance with a spatial hash                                                                                                                     | ✅ done |
+| M3  | Economy: gathering, drop-off, construction, houses/pop cap, training queues, command/build panels                                                                                                                                                 | ✅ done |
+| M4  | Combat, counter matrix, health bars, projectiles, fog of war, minimap, win/lose                                                                                                                                                                   | ✅ done |
+| M5  | Ages, minor god choice per age, tech tree, heroes                                                                                                                                                                                                 | ✅ done |
+| M6  | Favor (per-faction income mode), mythic units, god powers, the three factions fully data-driven                                                                                                                                                   | ✅ done |
+| M7  | AI opponent (utility AI + build orders), Easy/Normal/Hard, AI debug overlay                                                                                                                                                                       | ✅ done |
+| M8  | Menus, pre-match, tutorial, settings, i18n (nb/en) completion, audio, polish, performance + balance pass                                                                                                                                          | ✅ done |
 | M9  | Capacitor (Android/iOS) config, store-readiness checklist                                                                                                                                                                                         |         |
 
 Every milestone ends with: `npm run lint && npm test && npm run build && npm run e2e` (Playwright, phone
@@ -37,16 +37,18 @@ viewport with touch emulation, screenshot in `e2e-output/`), then a git commit.
    keeps lockstep multiplayer and replays possible later.
 4. **All player/AI intent goes through a command queue** applied at tick boundaries (the same path a
    network or replay would use). The AI gets the same API as the player.
-5. **Lightweight ECS:** numeric entity ids, components in dense typed stores, systems as plain functions
-   run in a fixed order. No ECS library (not needed at this scale; easier to read).
+5. **Component-style entities without an ECS library:** one flat entity shape with component
+   field groups (monomorphic, trivially serialisable) and systems as plain functions run in a fixed
+   order (see ARCHITECTURE.md).
 6. **HUD/menus are DOM overlays, the world is Phaser.** CSS gives us `env(safe-area-inset-*)`, scalable
    text, 48 dp targets, dark/light themes and accessibility for free. HUD updates are throttled
    (event-driven or ~5 Hz) so they never cost frame time.
 7. **Canvas renders at devicePixelRatio (capped at 2)** for crisp art; the cap becomes a graphics
    quality setting.
-8. **Pathfinding (M2):** A\* on the tile grid (octile, binary heap, pooled) for individual units; a cached
-   **flow field** per target when ≥ 8 units share a destination; local separation steering via a spatial
-   hash. Buildings stamp the passability grid.
+8. **Pathfinding:** A\* on the tile grid (octile, binary heap, reused buffers) with string-pulling,
+   skipped entirely for straight lines; group moves use formation slots so units don't fight over
+   one point; separation steering via a spatial hash; connected-region checks avoid hopeless
+   searches. (Flow fields were not needed at this map size.)
 9. **Fog of war (M4)** lives in the sim as a per-player visibility grid so the AI can be held to the same
    information rules; the renderer just displays it.
 10. **PWA without workbox:** a ~40-line Vite plugin emits `sw.js` with a precache list of the built files
@@ -98,6 +100,21 @@ Example units (full lists live in `src/data`): Hrimfolk _Hearthkin_ (worker), _S
 _Rimehulk_ and _Fenwyrm_. Aurelian _Citizen_, _Bronzeguard_, _Slinger_, _Lancer_, _Torsion Engine_,
 hero _Lionheart Paragon_, mythic _Gorgonath_ and _Hydrake_. Sahrun _Toiler_, _Khopesh Guard_, _Sandbow_,
 _Dune Chariot_, _Sun Lens_, hero _Sun-Priest_, mythic _Scarab Colossus_ and _Jackal Sentinel_.
+
+## Balance notes (M8)
+
+Tuned with `npm run balance` (Normal AI vs Normal AI, 3 seeds × 3 matchups). After the pass every
+game ends decisively in 15–30 game-minutes (median ≈ 20; human-vs-AI games are usually shorter)
+and wins are spread across factions (Hrimfolk 3, Aurelian 4, Sahrun 2). Changes made: Hrimfolk
+favor from combat +67%, sturdier workers/infantry; Aurelian hero and shrine nerfs; cheaper Heroic
+and Mythic ages; +10% gather rates; more gold on maps; the AI scouts for and travels to distant gold
+and commits harder late in the match.
+
+## Not done / later
+
+- Saving a match in progress (settings and statistics are saved).
+- Ships and a Wonder victory condition.
+- Real art and music (all assets are generated placeholders behind the asset manifest / music hook).
 
 ## Open questions (non-blocking)
 

@@ -3,12 +3,41 @@ import type { SimEvent, World } from '../../sim/world';
 import type { MatchArt } from '../assets/matchArt';
 import { TILE_PX } from '../assets/tileset';
 
+/** A floating damage number built from pre-rendered digit sprites (no text re-rendering). */
 interface Floater {
-  text: Phaser.GameObjects.Text;
+  digits: Phaser.GameObjects.Image[];
   until: number;
+  active: boolean;
 }
 
-const MAX_FLOATERS = 24;
+const MAX_FLOATERS = 32;
+const DIGIT_W = 14;
+
+/** Create the digit sheet once: frames 'y0'..'y9' (yellow) and 'r0'..'r9' (red). */
+function ensureDigits(scene: Phaser.Scene): void {
+  if (scene.textures.exists('digits')) return;
+  const cv = document.createElement('canvas');
+  cv.width = 20 * 10;
+  cv.height = 56;
+  const c = cv.getContext('2d')!;
+  c.font = 'bold 24px system-ui, sans-serif';
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  c.lineWidth = 4;
+  c.strokeStyle = '#000';
+  ['#ffe58a', '#ff8080'].forEach((col, row) => {
+    for (let d = 0; d < 10; d++) {
+      c.strokeText(String(d), d * 20 + 10, row * 28 + 14);
+      c.fillStyle = col;
+      c.fillText(String(d), d * 20 + 10, row * 28 + 14);
+    }
+  });
+  const tex = scene.textures.addCanvas('digits', cv)!;
+  for (let d = 0; d < 10; d++) {
+    tex.add(`y${d}`, 0, d * 20, 0, 20, 28);
+    tex.add(`r${d}`, 0, d * 20, 28, 20, 28);
+  }
+}
 
 /** Projectiles, damage numbers, death fades and other short-lived visuals. */
 export class EffectsRenderer {
@@ -24,6 +53,7 @@ export class EffectsRenderer {
     this.scene = scene;
     this.art = art;
     this.fx = scene.add.graphics().setDepth(4e5);
+    ensureDigits(scene);
   }
 
   update(world: World, alpha: number, visible: (x: number, y: number) => boolean): void {
@@ -55,14 +85,19 @@ export class EffectsRenderer {
     // Damage numbers float up and fade.
     const now = this.scene.time.now;
     for (const fl of this.floaters) {
-      if (!fl.text.visible) continue;
+      if (!fl.active) continue;
       const left = fl.until - now;
       if (left <= 0) {
-        fl.text.setVisible(false);
+        fl.active = false;
+        for (const d of fl.digits) d.setVisible(false);
         continue;
       }
-      fl.text.y -= 0.6;
-      fl.text.setAlpha(Math.min(1, left / 300));
+      const a = Math.min(1, left / 300);
+      for (const d of fl.digits) {
+        if (!d.visible) continue;
+        d.y -= 0.6;
+        d.setAlpha(a);
+      }
     }
   }
 
@@ -175,24 +210,26 @@ export class EffectsRenderer {
   }
 
   private floater(x: number, y: number, s: string, color: string): void {
-    let fl = this.floaters.find((f) => !f.text.visible);
+    let fl = this.floaters.find((f) => !f.active);
     if (!fl) {
       if (this.floaters.length >= MAX_FLOATERS) return;
-      const text = this.scene.add
-        .text(0, 0, '', {
-          fontFamily: 'system-ui, sans-serif',
-          fontSize: '22px',
-          fontStyle: 'bold',
-          color: '#fff',
-          stroke: '#000',
-          strokeThickness: 4,
-        })
-        .setOrigin(0.5)
-        .setDepth(6e5);
-      fl = { text, until: 0 };
+      fl = { digits: [], until: 0, active: false };
       this.floaters.push(fl);
     }
-    fl.text.setText(s).setColor(color).setPosition(x, y).setVisible(true).setAlpha(1);
+    const prefix = color === '#ffe58a' ? 'y' : 'r';
+    const n = Math.min(s.length, 4);
+    while (fl.digits.length < n)
+      fl.digits.push(this.scene.add.image(0, 0, 'digits', 'y0').setDepth(6e5));
+    const x0 = x - ((n - 1) * DIGIT_W) / 2;
+    fl.digits.forEach((d, i) => {
+      if (i < n)
+        d.setFrame(`${prefix}${s[i]}`)
+          .setPosition(x0 + i * DIGIT_W, y)
+          .setVisible(true)
+          .setAlpha(1);
+      else d.setVisible(false);
+    });
+    fl.active = true;
     fl.until = this.scene.time.now + 700;
   }
 

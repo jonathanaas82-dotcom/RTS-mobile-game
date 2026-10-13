@@ -3,7 +3,7 @@ export const RULES = {
   /** Favor cap per player. */
   maxFavor: 200,
   /** Hrimfolk: Favor per point of damage dealt by military units. */
-  combatFavorPerDamage: 0.012,
+  combatFavorPerDamage: 0.02,
   /** Aurelian: extra Favor/s per living hero. */
   heroFavorRate: 0.1,
   /** Units heal this many HP/s when out of combat for `regenDelay` (heroes only). */
@@ -16,7 +16,7 @@ export const RULES = {
   /** How often (ticks) fog of war is recomputed. */
   fogInterval: 4,
   /** Max A* searches per tick (the rest wait a tick). */
-  pathBudgetPerTick: 24,
+  pathBudgetPerTick: 12,
   /** Repath chasing units every N ticks. */
   chaseRepathTicks: 10,
   /** Seconds a summoned unit lives by default. */

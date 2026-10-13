@@ -93,6 +93,8 @@ export function pathSystem(world: World): void {
           return { x0: gx, y0: gy, x1: gx, y1: gy, adjacent: false };
         })();
     const tiles = world.path.find(e.x, e.y, goal);
+    // Unreachable goal: we walk to the closest point; don't retry the expensive search for a while.
+    if (!world.path.lastFound) e.repathAt = world.tick + 60;
     e.path = smoothPath(grid, e.x, e.y, tiles, t ? undefined : e.goalX, t ? undefined : e.goalY);
     if (!t && e.path.length >= 2) {
       // If the final tile was reached exactly, finish at the precise requested point.

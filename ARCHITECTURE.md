@@ -7,12 +7,21 @@ src/
   sim/         Deterministic simulation — pure TS, no Phaser/DOM (lint-enforced)
     core/      Rng (mulberry32), FixedStepLoop
     map/       Terrain, value noise, procedural map generator
-    world.ts   World state + state hash
+    path/      A* pathfinder + path smoothing
+    systems/   orders, combat, powers/favor, production, economy, movement, fog, victory
+    entity.ts  Flat entity shape (units, buildings, resources)
+    player.ts  Player state, modifiers (cached), costs
+    rules.ts   Shared rule queries (can train/place/research/advance/cast)
+    grid.ts    Occupancy, passability, connected regions
+    spatial.ts Zero-allocation spatial hash
+    world.ts   World state, spawn/kill helpers, state hash
     commands.ts Command types (the only way to change the world)
-    simulation.ts  Tick driver: applies commands, runs systems in order
-  ai/          (M7) AI players — issue Commands like a human; no Phaser/DOM
-  render/      Phaser: scenes, camera, procedural placeholder art, asset manifest
-  ui/          DOM HUD/menus, gesture recognizer, settings
+    simulation.ts  Tick driver: controllers -> commands -> systems
+  ai/          AIController (economy, build order, army, waves, powers) + placement
+  game/        createMatch(): Simulation + AI controllers (no Phaser)
+  render/      Phaser: scenes, camera, entity/effects/fog renderers, minimap, procedural art
+  ui/          DOM HUD, command card, menus, tutorial, gestures, selection, settings, stats
+  audio/       Procedural Web Audio sound effects (+ music hook)
   i18n/        t(key) + en/nb dictionaries
   platform/    PWA, fullscreen/orientation, haptics
 build/         Vite plugins (service-worker precache)
@@ -50,6 +59,31 @@ tests/         Vitest unit tests (sim, input, camera, i18n)
   tileset follows the layout contract in `src/render/assets/tileset.ts`.
 - **Real time.** The sim is driven by Phaser's `rawDelta` (unsmoothed); Phaser's capped `delta`
   would slow the match on a struggling device.
+
+## Entities and systems
+
+All entities share one flat object shape (`src/sim/entity.ts`) with component-like field groups
+(unit: order/path/carry/combat timers; building: footprint/queue/rally; resource: amount). A single
+shape keeps V8 objects monomorphic and serialisation trivial. Systems run in a fixed order each
+tick: `orderSystem` (unit behaviours: gather/build/attack/attack-move/auto-acquire) → `combat`
+(cooldowns, projectiles, towers, regen) → `powerEffects` → `favor` → `production` → `path`
+(budgeted A*) → `movement` (steering + separation via the spatial hash) → `fog` → `victory`.
+
+## AI
+
+`AIController` (src/ai) is a `Controller` attached by `createMatch`. It thinks every N ticks,
+reads only fog-visible enemy information (plus the public enemy start position) and emits the
+same Commands as the touch UI. Tuning lives in `src/data/ai.ts`. Its decision log is shown in the
+debug overlay (Settings → Debug info).
+
+## Performance
+
+- Sim: ~1 ms/tick for a 200-unit battle (node); pathfinding is budgeted per tick, skipped for
+  straight lines, backs off after unreachable goals, and units ignore enemies in other regions.
+- Render: one atlas per match for all unit/building sprites (batched draws), off-screen culling,
+  pooled sprites/projectiles/damage digits, bars and rings drawn into two Graphics objects, HUD
+  refresh throttled to 5 Hz, minimap 4 Hz, fog texture re-uploaded only on fog ticks.
+- The debug overlay shows per-section frame cost; `npm run e2e` measures it with 180+ units.
 
 ## Rendering & input
 

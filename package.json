@@ -12,7 +12,8 @@
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
     "e2e": "node scripts/e2e-mobile.mjs",
-    "icons": "node scripts/gen-icons.mjs"
+    "icons": "node scripts/gen-icons.mjs",
+    "balance": "vitest run --config vitest.balance.config.ts --reporter=verbose"
   },
   "dependencies": {
     "phaser": "3.90.0"

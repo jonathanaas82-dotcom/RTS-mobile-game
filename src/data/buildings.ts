@@ -133,7 +133,7 @@ export const BUILDINGS: BuildingDef[] = [
     buildTime: 20,
     age: 0,
     factions: ['aurelian'],
-    favorRate: 0.22,
+    favorRate: 0.18,
     limit: 5,
     sight: 5,
     art: 'shrine',

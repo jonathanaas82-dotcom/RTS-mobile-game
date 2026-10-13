@@ -13,7 +13,8 @@ export const FACTIONS: FactionDef[] = [
     worker: 'hearthkin',
     bonuses: [
       { stat: 'cost', mul: 0.9, classes: ['infantry'] },
-      { stat: 'hp', mul: 1.1, classes: ['infantry'] },
+      { stat: 'hp', mul: 1.15, classes: ['infantry'] },
+      { stat: 'speed', mul: 1.05, classes: ['infantry', 'worker'] },
     ],
     majorGods: ['thunrak', 'veyla'],
     minorGods: { 1: ['hrodna', 'skarn'], 2: ['brakka', 'eldra'], 3: ['gorm', 'sigrun'] },
@@ -33,7 +34,7 @@ export const FACTIONS: FactionDef[] = [
     },
     worker: 'citizen',
     bonuses: [
-      { stat: 'damage', mul: 1.1, classes: ['hero'] },
+      { stat: 'damage', mul: 1.05, classes: ['hero'] },
       { stat: 'trainTime', mul: 0.85, classes: ['hero'] },
     ],
     majorGods: ['aetheon', 'thalassine'],
@@ -71,10 +72,10 @@ export interface AgeDef {
 export const AGES: AgeDef[] = [
   { name: { en: 'Archaic Age', nb: 'Arkaisk tid' }, cost: {}, time: 0 },
   { name: { en: 'Classical Age', nb: 'Klassisk tid' }, cost: { food: 400, gold: 50 }, time: 40 },
-  { name: { en: 'Heroic Age', nb: 'Heltetid' }, cost: { food: 700, gold: 450 }, time: 55 },
+  { name: { en: 'Heroic Age', nb: 'Heltetid' }, cost: { food: 650, gold: 400 }, time: 50 },
   {
     name: { en: 'Mythic Age', nb: 'Mytisk tid' },
-    cost: { food: 1000, gold: 900, favor: 30 },
+    cost: { food: 900, gold: 750, favor: 25 },
     time: 70,
   },
 ];

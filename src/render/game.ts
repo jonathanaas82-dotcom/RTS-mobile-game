@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { CONTEXT_KEY, type AppContext, type MatchStartData } from './context';
+import { CONTEXT_KEY, type AppContext } from './context';
 import { BootScene } from './scenes/BootScene';
 import { WorldScene } from './scenes/WorldScene';
 
@@ -7,11 +7,7 @@ import { WorldScene } from './scenes/WorldScene';
  * Create the Phaser game. The canvas is rendered at `renderScale` × CSS size (crisp on high-DPI
  * screens) and displayed at CSS size via the scale manager's zoom.
  */
-export function createGame(
-  parent: HTMLElement,
-  ctx: AppContext,
-  match: MatchStartData,
-): Phaser.Game {
+export function createGame(parent: HTMLElement, ctx: AppContext): Phaser.Game {
   const rs = ctx.renderScale;
   const size = (): [number, number] => [
     Math.max(1, Math.round(window.innerWidth * rs)),
@@ -34,7 +30,7 @@ export function createGame(
   game.registry.set(CONTEXT_KEY, ctx);
   game.scene.add('Boot', BootScene);
   game.scene.add('World', WorldScene);
-  game.scene.start('Boot', match);
+  game.scene.start('Boot');
 
   const onResize = (): void => {
     const [nw, nh] = size();

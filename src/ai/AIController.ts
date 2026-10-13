@@ -87,6 +87,7 @@ export class AIController implements Controller {
     if (this.profile.techs) this.research(p);
     this.production(p);
     this.army(p);
+    this.scout();
     this.powers(p);
     if (this.profile.micro) this.heroes();
     for (const c of this.pending) issue(c);
@@ -337,7 +338,8 @@ export class AIController implements Controller {
       return true;
     }
     let best: Entity | null = null;
-    let bestD = 18 * 18;
+    // Food stays close to home; gold may be far away (a storehouse follows the miners).
+    let bestD = kind === 'gold' ? Infinity : 18 * 18;
     for (const e of w.entities) {
       if (e.dead) continue;
       let ok = false;
@@ -555,7 +557,11 @@ export class AIController implements Controller {
     const weights = ids.map((id) => {
       const cls = unitDef(id).cls;
       let wgt = mix[cls as 'infantry'] ?? 0.2;
-      if (cls === 'siege') wgt = this.wave || p.age >= 2 ? 0.12 : 0;
+      if (cls === 'siege') {
+        // Siege breaks town halls: keep 2–4 around from the Heroic age on.
+        const siege = this.armyUnits().filter((u) => u.cls === 'siege').length;
+        wgt = p.age >= 2 ? (siege < 2 ? 0.6 : siege < 4 ? 0.15 : 0.02) : 0;
+      }
       if (this.profile.counters && totalSeen > 1 && cls !== 'siege') {
         let edge = 0;
         for (const [ec, n] of Object.entries(this.enemyMix) as Array<[UnitClass, number]>) {
@@ -614,7 +620,10 @@ export class AIController implements Controller {
     const minutes = w.tick / TPS / 60;
     const pop = army.reduce((s, u) => s + unitDef(u.def).pop, 0);
     if (!this.wave) {
-      const need = this.profile.wavePop + this.profile.waveGrowth * this.wavesSent;
+      const need = Math.min(
+        this.profile.wavePop + this.profile.waveGrowth * this.wavesSent,
+        this.profile.wavePop * 2.2,
+      );
       if (minutes >= this.profile.firstAttackMin && pop >= need) {
         const t = this.attackTarget();
         this.wave = { launched: w.tick, strength: this.strength(army), tx: t.x, ty: t.y };
@@ -639,7 +648,9 @@ export class AIController implements Controller {
     }
     // Wave in progress.
     const s = this.strength(army);
-    if (s < this.wave.strength * this.profile.retreatAt) {
+    // Late in the match, commit harder (fewer retreats) so games reach a conclusion.
+    const late = w.tick / TPS / 60 > 18 ? 0.5 : 1;
+    if (s < this.wave.strength * this.profile.retreatAt * late) {
       const r = this.rally();
       this.cmd({ type: 'move', player: this.me, ids: army.map((u) => u.id), x: r.x, y: r.y });
       this.say('retreat');
@@ -670,6 +681,44 @@ export class AIController implements Controller {
       this.wavesSent++;
     }
     void p;
+  }
+
+  private lastScout = -10000;
+
+  /** No known gold left: send a unit to explore the nearest unexplored area. */
+  private scout(): void {
+    const w = this.world;
+    if (w.tick - this.lastScout < TPS * 30 || this.profile.passive) return;
+    const fog = w.fog[this.me]!;
+    const knownGold = w.entities.some(
+      (e) =>
+        !e.dead && e.def === 'gold' && fog[Math.floor(e.y) * w.map.width + Math.floor(e.x)] !== 0,
+    );
+    if (knownGold) return;
+    this.lastScout = w.tick;
+    const h = this.home();
+    if (!h) return;
+    const scout =
+      this.armyUnits().find((u) => u.order.type === 'idle') ??
+      this.mine((e) => e.cls === 'worker' && e.order.type === 'idle')[0] ??
+      this.armyUnits()[0];
+    if (!scout) return;
+    // Nearest unexplored walkable tile, sampled on a coarse grid.
+    let best: { x: number; y: number } | null = null;
+    let bestD = Infinity;
+    for (let y = 2; y < w.map.height; y += 4) {
+      for (let x = 2; x < w.map.width; x += 4) {
+        if (fog[y * w.map.width + x] !== 0 || w.grid.isBlocked(x, y)) continue;
+        const d = (x - h.x) ** 2 + (y - h.y) ** 2;
+        if (d < bestD) {
+          bestD = d;
+          best = { x: x + 0.5, y: y + 0.5 };
+        }
+      }
+    }
+    if (!best) return;
+    this.cmd({ type: 'move', player: this.me, ids: [scout.id], x: best.x, y: best.y });
+    this.say('scout for gold');
   }
 
   /** With no army at home, nearby workers fight raiders (they all have a weak attack). */
@@ -717,7 +766,8 @@ export class AIController implements Controller {
     let best: KnownBuilding | null = null;
     let bestD = Infinity;
     for (const k of this.known.values()) {
-      const d = (k.x - h.x) ** 2 + (k.y - h.y) ** 2 + (k.main ? 50 : 0);
+      // Town Halls are the decisive target: strongly preferred once known.
+      const d = ((k.x - h.x) ** 2 + (k.y - h.y) ** 2) * (k.main ? 0.35 : 1);
       if (d < bestD) {
         bestD = d;
         best = k;
