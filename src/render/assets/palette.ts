@@ -1,0 +1,27 @@
+/** Shared placeholder palette so generated art stays visually consistent. */
+export const PALETTE = {
+  grass: ['#5e9b47', '#609d49', '#5c9845', '#619e4a'],
+  grassDark: '#3f7432',
+  grassLight: '#86c063',
+  sand: '#d8c385',
+  sandDark: '#b9a265',
+  water: '#2f6fae',
+  waterDeep: '#25578c',
+  waterLight: '#6fa6d8',
+  foam: '#e3f1fb',
+  cliff: '#7d7368',
+  cliffDark: '#4e463f',
+  cliffLight: '#a49a8c',
+  treeDark: '#1f5a2c',
+  tree: '#2d7a3a',
+  treeLight: '#4f9c4c',
+  trunk: '#5b3a22',
+  gold: '#e8b830',
+  goldLight: '#ffe58a',
+  goldDark: '#9c7414',
+  berry: '#c0303f',
+  berryLeaf: '#2f7a35',
+  shadow: 'rgba(0,0,0,0.25)',
+  /** Player colours (slot order). */
+  players: ['#3b82f6', '#e5484d', '#22c55e', '#eab308'],
+} as const;

@@ -1,0 +1,8 @@
+{
+  "appId": "com.godforge.game",
+  "appName": "Godforge",
+  "webDir": "dist",
+  "backgroundColor": "#16241a",
+  "android": { "allowMixedContent": false },
+  "ios": { "contentInset": "never" }
+}
