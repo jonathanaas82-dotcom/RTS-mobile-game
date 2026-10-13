@@ -21,6 +21,8 @@ export type QueueItemKind = 'unit' | 'tech' | 'age';
 
 export interface QueueItem {
   kind: QueueItemKind;
+  /** Resources paid (refunded on cancel). */
+  paid: Partial<Record<ResourceKind, number>>;
   /** Unit id, tech id, or god id (age advance). */
   id: string;
   /** Progress in ticks. */
@@ -60,8 +62,12 @@ export interface Entity {
   /** Final goal of the current path (for stuck detection / repath). */
   goalX: number;
   goalY: number;
-  /** Entity whose footprint the path should reach (-1 = point goal). */
-  goalTarget: number;
+  /** Rect goal (footprint to stand next to); goalSize 0 = point goal. */
+  goalTX: number;
+  goalTY: number;
+  goalSize: number;
+  /** Failed approach attempts for the current order (gives up after a few). */
+  tries: number;
   /** Ticks without getting closer to the goal, and the best distance so far. */
   stuck: number;
   bestGoalDist: number;
@@ -122,7 +128,10 @@ export function createEntity(id: number, kind: EntityKind, def: string, owner: n
     needsPath: false,
     goalX: 0,
     goalY: 0,
-    goalTarget: -1,
+    goalTX: 0,
+    goalTY: 0,
+    goalSize: 0,
+    tries: 0,
     stuck: 0,
     bestGoalDist: 1e9,
     repathAt: 0,
@@ -155,19 +164,22 @@ export function isRect(e: Entity): boolean {
   return e.kind !== 'unit';
 }
 
+/** Distance from a point to a tile rectangle (0 inside). */
+export function distToRect(x: number, y: number, tx: number, ty: number, size: number): number {
+  const x1 = tx + size;
+  const y1 = ty + size;
+  const dx = x < tx ? tx - x : x > x1 ? x - x1 : 0;
+  const dy = y < ty ? ty - y : y > y1 ? y - y1 : 0;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
 /** Distance from point to the edge of an entity (0 inside). */
 export function distToEntity(x: number, y: number, e: Entity): number {
   if (e.kind === 'unit') {
     const d = Math.sqrt((x - e.x) ** 2 + (y - e.y) ** 2) - e.radius;
     return d < 0 ? 0 : d;
   }
-  const x0 = e.tileX;
-  const y0 = e.tileY;
-  const x1 = e.tileX + e.size;
-  const y1 = e.tileY + e.size;
-  const dx = x < x0 ? x0 - x : x > x1 ? x - x1 : 0;
-  const dy = y < y0 ? y0 - y : y > y1 ? y - y1 : 0;
-  return Math.sqrt(dx * dx + dy * dy);
+  return distToRect(x, y, e.tileX, e.tileY, e.size);
 }
 
 /** Edge-to-edge distance between a unit and any entity. */

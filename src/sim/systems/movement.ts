@@ -1,7 +1,7 @@
 import { unitDef } from '../../data';
 import { SIM } from '../../data/balance/sim';
 import { RULES } from '../../data/balance/rules';
-import { distToEntity, type Entity } from '../entity';
+import { distToRect, type Entity } from '../entity';
 import { smoothPath, walkable } from '../path/astar';
 import { statOf, type World } from '../world';
 
@@ -11,7 +11,7 @@ const TPS = SIM.ticksPerSecond;
 export function moveTo(e: Entity, x: number, y: number): void {
   e.goalX = x;
   e.goalY = y;
-  e.goalTarget = -1;
+  e.goalSize = 0;
   e.needsPath = true;
   e.path.length = 0;
   e.pathIdx = 0;
@@ -21,9 +21,20 @@ export function moveTo(e: Entity, x: number, y: number): void {
 
 /** Ask for a path to stand next to a building/resource (or near a unit). */
 export function moveToEntity(e: Entity, target: Entity): void {
-  e.goalX = target.x;
-  e.goalY = target.y;
-  e.goalTarget = target.kind === 'unit' ? -1 : target.id;
+  if (target.kind === 'unit') {
+    moveTo(e, target.x, target.y);
+    return;
+  }
+  moveToRect(e, target.tileX, target.tileY, target.size);
+}
+
+/** Ask for a path to stand next to a rectangle of tiles (footprint or forest tile). */
+export function moveToRect(e: Entity, tx: number, ty: number, size: number): void {
+  e.goalX = tx + size / 2;
+  e.goalY = ty + size / 2;
+  e.goalTX = tx;
+  e.goalTY = ty;
+  e.goalSize = size;
   e.needsPath = true;
   e.path.length = 0;
   e.pathIdx = 0;
@@ -49,7 +60,7 @@ export function pathSystem(world: World): void {
   for (const e of world.entities) {
     if (e.dead || e.kind !== 'unit' || !e.needsPath) continue;
     // Straight line possible? Skip A* entirely (the common case for short moves).
-    if (e.goalTarget < 0 && walkable(grid, e.x, e.y, e.goalX, e.goalY)) {
+    if (e.goalSize === 0 && walkable(grid, e.x, e.y, e.goalX, e.goalY)) {
       e.path = [e.goalX, e.goalY];
       e.pathIdx = 0;
       e.needsPath = false;
@@ -57,13 +68,13 @@ export function pathSystem(world: World): void {
     }
     if (world.pathsThisTick >= RULES.pathBudgetPerTick) continue;
     world.pathsThisTick++;
-    const t = e.goalTarget >= 0 ? world.byId.get(e.goalTarget) : undefined;
+    const t = e.goalSize > 0;
     const goal = t
       ? {
-          x0: t.tileX,
-          y0: t.tileY,
-          x1: t.tileX + t.size - 1,
-          y1: t.tileY + t.size - 1,
+          x0: e.goalTX,
+          y0: e.goalTY,
+          x1: e.goalTX + e.goalSize - 1,
+          y1: e.goalTY + e.goalSize - 1,
           adjacent: true,
         }
       : (() => {
@@ -145,9 +156,7 @@ export function movementSystem(world: World): void {
     // Stuck detection by progress towards the goal: crowds at the destination simply stop;
     // elsewhere we repath once in a while.
     const dGoal =
-      e.goalTarget >= 0
-        ? distToGoalEntity(world, e)
-        : Math.sqrt((e.goalX - e.x) ** 2 + (e.goalY - e.y) ** 2);
+      e.goalSize > 0 ? distToGoalRect(e) : Math.sqrt((e.goalX - e.x) ** 2 + (e.goalY - e.y) ** 2);
     if (dGoal < e.bestGoalDist - 0.05) {
       e.bestGoalDist = dGoal;
       e.stuck = 0;
@@ -156,7 +165,7 @@ export function movementSystem(world: World): void {
     }
     if (
       e.stuck > 16 &&
-      (dGoal < 2.5 + Math.sqrt(world.spatial.query(e.x, e.y, 2).length) * 0.4 || e.goalTarget >= 0)
+      (dGoal < 2.5 + Math.sqrt(world.spatial.query(e.x, e.y, 2).length) * 0.4 || e.goalSize > 0)
     ) {
       stopMoving(e);
     } else if (e.stuck > 60) {
@@ -168,10 +177,8 @@ export function movementSystem(world: World): void {
   separate(world);
 }
 
-function distToGoalEntity(world: World, e: Entity): number {
-  const t = world.byId.get(e.goalTarget);
-  if (!t) return 0;
-  return distToEntity(e.x, e.y, t);
+function distToGoalRect(e: Entity): number {
+  return distToRect(e.x, e.y, e.goalTX, e.goalTY, e.goalSize);
 }
 
 /** Move to (nx, ny) unless that enters a blocked tile; slide along walls. Returns distance moved. */

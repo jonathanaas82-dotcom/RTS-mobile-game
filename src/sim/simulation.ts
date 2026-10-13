@@ -1,7 +1,9 @@
 import { applyMovementCommand } from './actions';
+import { applyEconomyCommand } from './economyActions';
 import type { Command, ScheduledCommand } from './commands';
 import { movementSystem, pathSystem } from './systems/movement';
 import { orderSystem } from './systems/orders';
+import { productionSystem } from './systems/production';
 import { cleanupDead, createWorld, type MatchConfig, type SimEvent, type World } from './world';
 
 /** A system advances one aspect of the world by exactly one tick. Systems run in array order. */
@@ -13,7 +15,12 @@ export interface Controller {
 }
 
 /** Fixed order of systems. Changing it changes the simulation (and replays). */
-export const DEFAULT_SYSTEMS: System[] = [orderSystem, pathSystem, movementSystem];
+export const DEFAULT_SYSTEMS: System[] = [
+  orderSystem,
+  productionSystem,
+  pathSystem,
+  movementSystem,
+];
 
 /**
  * Owns the world and advances it in fixed ticks. Rendering, input and AI talk to the match only
@@ -74,4 +81,5 @@ export function applyCommand(world: World, command: Command): void {
   const p = world.players[command.player];
   if (!p || p.defeated) return;
   if (applyMovementCommand(world, command)) return;
+  if (applyEconomyCommand(world, command)) return;
 }

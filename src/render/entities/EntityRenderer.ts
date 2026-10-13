@@ -5,6 +5,13 @@ import { BUILDING_OVERHANG } from '../assets/procedural/buildings';
 import type { MatchArt } from '../assets/matchArt';
 import { TILE_PX } from '../assets/tileset';
 
+const CARRY_COLORS: Record<string, number> = {
+  food: 0xe04858,
+  wood: 0x8a5a33,
+  gold: 0xe8b830,
+  favor: 0xb48cf2,
+};
+
 interface View {
   sprite: Phaser.GameObjects.Image;
   /** Foundation scaffold under buildings being constructed. */
@@ -91,6 +98,14 @@ export class EntityRenderer {
         }
         if (selected.has(e.id) || e.hp < e.maxHp)
           this.bar(bars, x, y - s.displayHeight * 0.85, e, 34);
+        if (e.carry > 0 && e.carryKind) {
+          // Little bundle showing what a worker carries.
+          const cy = y - s.displayHeight * 0.45;
+          bars.fillStyle(CARRY_COLORS[e.carryKind] ?? 0xffffff, 1);
+          bars.fillCircle(x - e.facing * 9, cy, 5);
+          bars.lineStyle(1.5, 0x2b2116, 1);
+          bars.strokeCircle(x - e.facing * 9, cy, 5);
+        }
       } else {
         s.setPosition(
           x - (e.size * TILE_PX) / 2,

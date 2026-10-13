@@ -270,6 +270,7 @@ export class CommandCard {
       });
     }
     for (const tech of techOptions(p, b.def)) {
+      if (tech.age > p.age) continue;
       const chk = canResearch(world, p, b, tech.id);
       if (chk.reason === 'researched') continue;
       const head = b.queue[0];

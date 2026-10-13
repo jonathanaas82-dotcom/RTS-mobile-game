@@ -1,5 +1,6 @@
 import type { Entity } from '../entity';
 import type { World } from '../world';
+import { buildBehavior, gatherBehavior, returnBehavior } from './economy';
 import { isMoving } from './movement';
 
 /**
@@ -20,8 +21,16 @@ function runOrder(world: World, e: Entity): void {
     case 'attackMove':
       if (!isMoving(e)) e.order.type = 'idle';
       break;
+    case 'gather':
+      gatherBehavior(world, e);
+      break;
+    case 'return':
+      returnBehavior(world, e);
+      break;
+    case 'build':
+      buildBehavior(world, e);
+      break;
     default:
       break;
   }
-  void world;
 }

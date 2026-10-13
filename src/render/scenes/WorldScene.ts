@@ -1,8 +1,8 @@
 import Phaser from 'phaser';
-import { buildingDef, godDef, loc } from '../../data';
+import { buildingDef, godDef, loc, techDef } from '../../data';
 import { AGES } from '../../data/factions';
 import { SIM, TICK_MS } from '../../data/balance/sim';
-import { getLanguage, t } from '../../i18n';
+import { getLanguage, t, type TranslationKey } from '../../i18n';
 import { haptic } from '../../platform/pwa';
 import type { Command } from '../../sim/commands';
 import { FixedStepLoop } from '../../sim/core/loop';
@@ -417,7 +417,17 @@ export class WorldScene extends Phaser.Scene {
     this.alpha = this.loop.advance(dt);
     for (const ev of this.sim.drainEvents()) {
       if (ev.type === 'treeCut') this.refreshTile(ev.tile);
-      else if (ev.type === 'underAttack' && ev.owner === ME) {
+      else if (ev.type === 'error' && ev.owner === ME) {
+        this.ctx.hud.showInfo(t(`err.${ev.code}` as TranslationKey));
+      } else if (ev.type === 'built' && ev.owner === ME) {
+        this.ctx.hud.showInfo(
+          t('ev.built', { name: loc(buildingDef(ev.def).name, getLanguage()) }),
+        );
+      } else if (ev.type === 'researched' && ev.owner === ME) {
+        this.ctx.hud.showInfo(
+          t('ev.researched', { name: loc(techDef(ev.tech).name, getLanguage()) }),
+        );
+      } else if (ev.type === 'underAttack' && ev.owner === ME) {
         this.alertPos = { x: ev.x, y: ev.y };
         this.ctx.hud.alert();
         if (this.ctx.settings.haptics) haptic([40, 60, 40]);

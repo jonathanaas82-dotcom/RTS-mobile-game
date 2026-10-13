@@ -213,6 +213,65 @@ try {
   );
   void scene;
 
+  // --- M3: build a house with the selected workers via the build menu + placement mode.
+  await page.locator('.cmd-btn[data-key="buildmenu"]').tap();
+  await page.waitForTimeout(250);
+  await page.locator('.cmd-btn[data-key="build:house"]').tap();
+  await page.waitForTimeout(250);
+  check(await page.locator('.hud-banner').isVisible(), 'placement banner shown');
+  const spot = await page.evaluate(() => {
+    const s = window.__godforge.game.scene.getScene('World');
+    const w = s.sim.world;
+    const hall = w.entities.find((e) => e.owner === 0 && e.def === 'town_hall');
+    for (let r = 3; r < 10; r++)
+      for (let dy = -r; dy <= r; dy++)
+        for (let dx = 0; dx <= r; dx++)
+          if (w.grid.canPlace(hall.tileX + dx, hall.tileY + dy, 2))
+            return [hall.tileX + dx + 1, hall.tileY + dy + 1];
+    return null;
+  });
+  const [hx, hy] = await toScreen(spot[0], spot[1]);
+  await tapAt(hx, hy);
+  await page.screenshot({ path: `${OUT}/03b-placement.png` });
+  await page.locator('.banner-btn.ok').tap();
+  await page.waitForTimeout(300);
+  const house = () =>
+    page.evaluate(() => {
+      const h = window.__godforge.game.scene
+        .getScene('World')
+        .sim.world.entities.find((e) => e.def === 'house' && e.owner === 0);
+      return h ? { built: h.built, progress: h.progress } : null;
+    });
+  check((await house()) !== null, 'confirming placement creates a house foundation');
+  await page.evaluate(() => window.__godforge.ctx.match.setSpeed(2));
+  await page.waitForTimeout(9000);
+  const h = await house();
+  check(h && (h.built || h.progress > 0.4), `workers construct the house (${JSON.stringify(h)})`);
+  await page.screenshot({ path: `${OUT}/03c-house.png` });
+
+  // --- Train a worker at the Town Hall.
+  const hallPos = await page.evaluate(() => {
+    const hall = window.__godforge.game.scene
+      .getScene('World')
+      .sim.world.entities.find((e) => e.owner === 0 && e.def === 'town_hall');
+    return [hall.x, hall.y];
+  });
+  const [tx2, ty2] = await toScreen(hallPos[0], hallPos[1]);
+  await tapAt(tx2, ty2);
+  const trainBtn = page.locator('.cmd-btn[data-key^="train:"]').first();
+  check(await trainBtn.isVisible(), 'town hall shows a train button');
+  await trainBtn.tap();
+  await page.waitForTimeout(300);
+  const queued = await page.evaluate(() => {
+    const hall = window.__godforge.game.scene
+      .getScene('World')
+      .sim.world.entities.find((e) => e.owner === 0 && e.def === 'town_hall');
+    return hall.queue.length;
+  });
+  check(queued === 1, `train button queues a worker (${queued})`);
+  await page.evaluate(() => window.__godforge.ctx.match.setSpeed(1));
+  await page.screenshot({ path: `${OUT}/03d-townhall.png` });
+
   // --- Menu button pauses with a modal.
   await page.locator('.hud-controls .hud-btn').first().tap();
   await page.waitForTimeout(150);
