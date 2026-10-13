@@ -34,6 +34,7 @@ export class Hud implements HudPort {
   private readonly bannerEl: HTMLElement;
   private readonly modalEl: HTMLElement;
   private readonly boxEl: HTMLElement;
+  private readonly announceEl: HTMLElement;
   private infoTimer = 0;
   private alertTimer = 0;
   private selKey = '';
@@ -111,6 +112,8 @@ export class Hud implements HudPort {
     this.bannerEl.hidden = true;
     this.boxEl = el('div', 'hud-boxsel', root);
     this.boxEl.hidden = true;
+    this.announceEl = el('div', 'hud-announce', root);
+    this.announceEl.hidden = true;
     this.modalEl = el('div', 'hud-modal', root);
     this.modalEl.hidden = true;
 
@@ -318,6 +321,19 @@ export class Hud implements HudPort {
     s.top = `${Math.min(r.y0, r.y1)}px`;
     s.width = `${Math.abs(r.x1 - r.x0)}px`;
     s.height = `${Math.abs(r.y1 - r.y0)}px`;
+  }
+
+  /** Big centred announcement (age reached, victory…) that fades out by itself. */
+  announce(title: string, subtitle = ''): void {
+    const a = this.announceEl;
+    a.innerHTML = '';
+    el('div', 'announce-title', a).textContent = title;
+    if (subtitle) el('div', 'announce-sub', a).textContent = subtitle;
+    a.hidden = false;
+    a.classList.remove('show');
+    void a.offsetWidth;
+    a.classList.add('show');
+    window.setTimeout(() => (a.hidden = true), 3200);
   }
 
   /** Flash the "jump to attack" button for a few seconds. */

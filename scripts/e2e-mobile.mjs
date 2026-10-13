@@ -272,6 +272,34 @@ try {
   await page.evaluate(() => window.__godforge.ctx.match.setSpeed(1));
   await page.screenshot({ path: `${OUT}/03d-townhall.png` });
 
+  // --- M5: advance to the Classical Age through the god-choice modal.
+  await page.evaluate(() => {
+    const p = window.__godforge.game.scene.getScene('World').sim.world.players[0];
+    p.res.food = 2000;
+    p.res.gold = 2000;
+    p.res.wood = 2000;
+  });
+  await page.waitForTimeout(300);
+  await page.locator('.cmd-btn[data-key="age"]').tap();
+  await page.waitForTimeout(250);
+  const choices = await page.locator('.modal-choice').count();
+  check(choices === 2, `age button offers two minor gods (${choices})`);
+  await page.screenshot({ path: `${OUT}/03e-godchoice.png` });
+  await page.locator('.modal-choice').first().tap();
+  await page.waitForTimeout(300);
+  await page.evaluate(() => {
+    const w = window.__godforge.game.scene.getScene('World').sim.world;
+    const hall = w.entities.find((e) => e.owner === 0 && e.def === 'town_hall');
+    for (const q of hall.queue) q.progress = q.total - 2;
+  });
+  await page.waitForTimeout(1200);
+  const age = await page.evaluate(
+    () => window.__godforge.game.scene.getScene('World').sim.world.players[0].age,
+  );
+  check(age === 1, `age advanced to Classical (${age})`);
+  check(await page.locator('.hud-announce').isVisible(), 'age-up announcement shown');
+  await page.screenshot({ path: `${OUT}/03f-ageup.png` });
+
   // --- M4: a staged skirmish near our base shows combat, projectiles and damage numbers.
   check(await page.locator('.hud-minimap canvas').isVisible(), 'minimap is shown');
   await page.evaluate(() => {

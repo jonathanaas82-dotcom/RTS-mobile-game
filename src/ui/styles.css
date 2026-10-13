@@ -776,3 +776,59 @@ body {
 .hud-btn.hud-panel.active {
   background: linear-gradient(180deg, #6b5520, #3a2e12);
 }
+
+.hud-announce {
+  position: absolute;
+  left: 50%;
+  top: 34%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  pointer-events: none;
+  text-shadow:
+    0 2px 6px #000,
+    0 0 18px rgba(0, 0, 0, 0.8);
+}
+
+.hud-announce.show {
+  animation: announce 3.2s ease-out forwards;
+}
+
+.announce-title {
+  font-family: var(--font-title);
+  font-size: calc(34px * var(--ui-scale));
+  color: var(--gold-hi);
+  letter-spacing: 0.08em;
+}
+
+.announce-sub {
+  font-size: calc(17px * var(--ui-scale));
+  color: var(--parchment);
+}
+
+@keyframes announce {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -40%) scale(0.9);
+  }
+  12% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.pantheon {
+  display: grid;
+  gap: 6px;
+  margin: 4px 0 8px;
+  font-size: 0.9em;
+}
+
+.pantheon b {
+  color: var(--gold-hi);
+}

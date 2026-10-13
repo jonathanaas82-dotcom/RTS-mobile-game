@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { buildingDef, godDef, loc, powerDef, techDef } from '../../data';
+import { buildingDef, factionDef, godDef, loc, powerDef, techDef } from '../../data';
 import { AGES } from '../../data/factions';
 import { SIM, TICK_MS } from '../../data/balance/sim';
 import { getLanguage, t, type TranslationKey } from '../../i18n';
@@ -10,7 +10,7 @@ import type { Entity } from '../../sim/entity';
 import { Simulation } from '../../sim/simulation';
 import { canAdvance, nextAge } from '../../sim/rules';
 import type { World } from '../../sim/world';
-import { CommandCard, costText, denialText } from '../../ui/commandCard';
+import { CommandCard, costText, denialText, powerIcon } from '../../ui/commandCard';
 import { GestureRecognizer, type GestureEvent } from '../../ui/input/gestures';
 import { MatchArt } from '../assets/matchArt';
 import { BUILDING_OVERHANG } from '../assets/procedural/buildings';
@@ -302,7 +302,13 @@ export class WorldScene extends Phaser.Scene {
           id: g,
           title: loc(d.name, lang),
           subtitle: loc(d.title, lang),
-          body: loc(d.desc, lang) + (chk.ok ? '' : `\n${denialText(chk)}`),
+          body:
+            loc(d.desc, lang) +
+            `\n${t('age.power')}: ${loc(powerDef(d.power).name, lang)}` +
+            (chk.ok ? '' : `\n${denialText(chk)}`),
+          icon: d.mythic
+            ? this.art.icon(`u:${d.mythic}:${ME}`)
+            : powerIcon(powerDef(d.power).kind, powerDef(d.power).color),
           disabled: !chk.ok,
           onChoose: () => {
             this.issue({ type: 'advanceAge', player: ME, building: b.id, god: g });
@@ -330,6 +336,7 @@ export class WorldScene extends Phaser.Scene {
         this.ctx.hud.onPauseChange(true);
         this.ctx.hud.showModal({
           title: t('hud.paused'),
+          body: this.pantheonText(),
           actions: [
             {
               label: t('hud.resume'),
@@ -376,6 +383,24 @@ export class WorldScene extends Phaser.Scene {
         if (this.alertPos) this.centerOnTile(this.alertPos.x, this.alertPos.y);
       },
     };
+  }
+
+  /** Summary of the local player's faction, gods and powers (pause menu). */
+  private pantheonText(): string {
+    const p = this.world.players[ME]!;
+    const lang = getLanguage();
+    const f = factionDef(p.faction);
+    const major = godDef(p.majorGod);
+    const lines = [
+      `${loc(f.name, lang)} · ${loc(AGES[p.age]!.name, lang)}`,
+      `${t('pantheon.major')}: ${loc(major.name, lang)} ${loc(major.title, lang)} — ${loc(major.desc, lang)}`,
+      ...p.gods.map((g) => {
+        const d = godDef(g);
+        return `${loc(AGES[d.age]!.name, lang)}: ${loc(d.name, lang)} — ${loc(d.desc, lang)}`;
+      }),
+      `${t('pantheon.favor')}: ${loc(f.favorDesc, lang)}`,
+    ];
+    return lines.join('\n');
   }
 
   private showGameOver(winner: number): void {
@@ -487,6 +512,16 @@ export class WorldScene extends Phaser.Scene {
           ev.kind === 'thunderclap' ? 0xcfe8ff : 0xfff3b0,
           500,
         );
+      } else if (ev.type === 'ageUp' && ev.owner === ME) {
+        const lang = getLanguage();
+        const g = godDef(ev.god);
+        this.ctx.hud.announce(
+          loc(AGES[ev.age]!.name, lang),
+          `${loc(g.name, lang)} ${loc(g.title, lang)}`,
+        );
+        if (this.ctx.settings.haptics) haptic([30, 50, 60]);
+      } else if (ev.type === 'ageUp' && ev.owner !== ME) {
+        this.ctx.hud.showInfo(t('ev.enemyAge', { age: loc(AGES[ev.age]!.name, getLanguage()) }));
       } else if (ev.type === 'gameOver') {
         this.showGameOver(ev.winner);
       } else if (ev.type === 'error' && ev.owner === ME) {
