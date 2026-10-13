@@ -175,7 +175,7 @@ export const nb: Partial<Record<TranslationKey, string>> = {
   'tut.done':
     'Bra jobbet! Du kan det grunnleggende: sanke, bygge, trene, kjempe og gå videre. Bruk gudekrefter (øverst) med gunst, og ødelegg fiendens rådhus for å vinne.',
   'cmd.shelter': 'Søk ly',
-  'cmd.shelterHint': 'Søk ly i nærmeste rådhus eller tårn (hver enhet gir en ekstra pil)',
+  'cmd.shelterHint': 'Søk ly i nærmeste rådhus eller tårn (hver enhet gir 20 % mer pileskade)',
   'cmd.release': 'Slipp ut',
   'sel.sheltered': 'I ly {n}/{cap}',
   'order.garrison': 'Søker ly',

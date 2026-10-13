@@ -16,7 +16,7 @@ export const BUILDINGS: BuildingDef[] = [
     sight: 9,
     attack: { damage: 8, range: 6, cooldown: 2, projectileSpeed: 10 },
     main: true,
-    garrison: 10,
+    garrison: 8,
     limit: 3,
     art: 'hall',
   },

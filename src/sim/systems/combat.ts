@@ -108,7 +108,7 @@ function splashDamage(
 function strike(world: World, e: Entity, target: Entity, atk: AttackDef): void {
   let dmg = statOf(world, e, 'damage', atk.damage);
   // Sheltered units add arrows to towers and town halls.
-  if (e.kind === 'building') dmg *= 1 + 0.35 * garrisonCount(world, e);
+  if (e.kind === 'building') dmg *= 1 + 0.2 * garrisonCount(world, e);
   const cls: UnitClass = e.kind === 'building' ? 'building' : (e.cls as UnitClass);
   e.lastAttack = world.tick;
   e.cooldown = secondsToTicks(atk.cooldown);

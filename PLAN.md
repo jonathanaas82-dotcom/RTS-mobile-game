@@ -103,12 +103,14 @@ _Dune Chariot_, _Sun Lens_, hero _Sun-Priest_, mythic _Scarab Colossus_ and _Jac
 
 ## Balance notes (M8)
 
-Tuned with `npm run balance` (Normal AI vs Normal AI, 3 seeds × 3 matchups). After the pass every
-game ends decisively in 15–30 game-minutes (median ≈ 20; human-vs-AI games are usually shorter)
-and wins are spread across factions (Hrimfolk 3, Aurelian 4, Sahrun 2). Changes made: Hrimfolk
-favor from combat +67%, sturdier workers/infantry; Aurelian hero and shrine nerfs; cheaper Heroic
-and Mythic ages; +10% gather rates; more gold on maps; the AI scouts for and travels to distant gold
-and commits harder late in the match.
+Tuned with `npm run balance` (Normal AI vs Normal AI, 3 seeds × 3 matchups). Latest report: wins
+Hrimfolk 3 · Aurelian 2 · Sahrun 3, one AI-vs-AI stalemate; decisive games last 23–36 game-minutes
+between two cautious AIs (human-vs-AI games are shorter; the Hard AI beats Easy in ~20).
+Changes made during the pass: Hrimfolk favor from combat +67% and sturdier workers/infantry;
+Aurelian hero, shrine and Lancer nerfs and Slingers now cost some gold; Sahrun faster training and
+stronger infantry/chariots; cheaper Heroic and Mythic ages; +10% gather rates; more gold on maps;
+shelter arrows +20% per unit; the AI scouts for distant gold, mines it with storehouses, and
+commits harder late in the match.
 
 ## Not done / later
 

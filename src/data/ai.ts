@@ -127,5 +127,5 @@ export const AI_ARMY_MIX: Record<
 > = {
   hrimfolk: { infantry: 0.55, ranged: 0.25, cavalry: 0.2, siege: 0.1 },
   aurelian: { infantry: 0.4, ranged: 0.3, cavalry: 0.3, siege: 0.1 },
-  sahrun: { infantry: 0.35, ranged: 0.4, cavalry: 0.25, siege: 0.1 },
+  sahrun: { infantry: 0.42, ranged: 0.3, cavalry: 0.28, siege: 0.1 },
 };

@@ -54,7 +54,7 @@ export const FACTIONS: FactionDef[] = [
     bonuses: [
       { stat: 'hp', mul: 1.25, classes: ['building'] },
       { stat: 'gather', mul: 1.05 },
-      { stat: 'trainTime', mul: 1.12, classes: ['infantry', 'ranged', 'cavalry'] },
+      { stat: 'trainTime', mul: 1.05, classes: ['infantry', 'ranged', 'cavalry'] },
     ],
     majorGods: ['solenkh', 'merit_asha'],
     minorGods: { 1: ['hetepra', 'seshkar'], 2: ['nefrisa', 'ankharu'], 3: ['kheprion', 'nemur'] },

@@ -173,7 +173,7 @@ export const en = {
   'tut.done':
     'Well done! You know the basics: gather, build, train, fight and advance. Use god powers (top) with Favor, and destroy the enemy Town Hall to win.',
   'cmd.shelter': 'Shelter',
-  'cmd.shelterHint': 'Shelter in the nearest Town Hall or tower (each unit adds an arrow)',
+  'cmd.shelterHint': 'Shelter in the nearest Town Hall or tower (each unit adds 20% arrow damage)',
   'cmd.release': 'Release sheltered units',
   'sel.sheltered': 'Sheltered {n}/{cap}',
   'order.garrison': 'Taking shelter',
