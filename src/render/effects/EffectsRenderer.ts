@@ -54,6 +54,53 @@ export class EffectsRenderer {
     this.art = art;
     this.fx = scene.add.graphics().setDepth(4e5);
     ensureDigits(scene);
+    const base = { emitting: false, speed: { min: 40, max: 130 } };
+    this.sparks = scene.add
+      .particles(0, 0, 'spark', {
+        ...base,
+        lifespan: { min: 180, max: 380 },
+        scale: { start: 0.32, end: 0 },
+        blendMode: 'ADD',
+        tint: 0xffe2a0,
+      })
+      .setDepth(4.2e5);
+    this.dust = scene.add
+      .particles(0, 0, 'soft', {
+        emitting: false,
+        speed: { min: 10, max: 45 },
+        lifespan: { min: 500, max: 900 },
+        scale: { start: 0.18, end: 0.5 },
+        alpha: { start: 0.55, end: 0 },
+        tint: 0xb59a70,
+      })
+      .setDepth(4.1e5);
+    this.magic = scene.add
+      .particles(0, 0, 'spark', {
+        emitting: false,
+        speed: { min: 15, max: 70 },
+        lifespan: { min: 600, max: 1100 },
+        scale: { start: 0.4, end: 0 },
+        alpha: { start: 1, end: 0 },
+        gravityY: -60,
+        blendMode: 'ADD',
+      })
+      .setDepth(4.3e5);
+  }
+
+  private readonly sparks: Phaser.GameObjects.Particles.ParticleEmitter;
+  private readonly dust: Phaser.GameObjects.Particles.ParticleEmitter;
+  private readonly magic: Phaser.GameObjects.Particles.ParticleEmitter;
+
+  /** Rising coloured motes (heal, magic, building completion). */
+  motes(x: number, y: number, color: number, count = 14): void {
+    if (!this.particles) return;
+    this.magic.setParticleTint(color);
+    this.magic.explode(count, x, y);
+  }
+
+  dustAt(x: number, y: number, count = 8): void {
+    if (!this.particles) return;
+    this.dust.explode(count, x, y);
   }
 
   update(world: World, alpha: number, visible: (x: number, y: number) => boolean): void {
@@ -70,7 +117,7 @@ export class EffectsRenderer {
             : 'p:arrow';
       const [key, f] = this.art.frame(frame);
       if (!img) {
-        img = this.scene.add.image(0, 0, key, f).setDepth(3e5);
+        img = this.scene.add.image(0, 0, key, f).setDepth(3e5).setScale(0.5);
         this.shots.push(img);
       } else if (img.frame.name !== f) img.setTexture(key, f);
       const x = (p.px + (p.x - p.px) * alpha) * TILE_PX;
@@ -109,6 +156,7 @@ export class EffectsRenderer {
   ): void {
     if (ev.type === 'hit') {
       if (!visible(ev.x, ev.y) || !onScreen(ev.x, ev.y) || ev.amount < 1) return;
+      if (this.particles) this.sparks.explode(3, ev.x * TILE_PX, ev.y * TILE_PX - 18);
       const jitter = ((ev.target * 7919) % 17) - 8;
       this.floater(
         ev.x * TILE_PX + jitter,
@@ -116,8 +164,11 @@ export class EffectsRenderer {
         String(Math.round(ev.amount)),
         ev.owner === me ? '#ffe58a' : '#ff8080',
       );
+    } else if (ev.type === 'built') {
+      // handled by the scene (needs the building position)
     } else if (ev.type === 'death') {
       if (!visible(ev.x, ev.y) || !onScreen(ev.x, ev.y)) return;
+      this.dustAt(ev.x * TILE_PX, ev.y * TILE_PX, ev.kind === 'building' ? 26 : 7);
       this.puff(
         ev.x * TILE_PX,
         ev.y * TILE_PX,
@@ -128,7 +179,8 @@ export class EffectsRenderer {
         const [key, f] = this.art.frame(`u:${ev.def}:${ev.owner}`);
         const ghost = this.scene.add
           .image(ev.x * TILE_PX, ev.y * TILE_PX, key, f)
-          .setOrigin(0.5, 0.85)
+          .setOrigin(0.5, 0.86)
+          .setScale(0.5)
           .setDepth(ev.y * TILE_PX)
           .setTint(0x555555);
         this.scene.tweens.add({

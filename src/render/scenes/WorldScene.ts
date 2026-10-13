@@ -18,7 +18,11 @@ import { CommandCard, costText, denialText, powerIcon } from '../../ui/commandCa
 import { GestureRecognizer, type GestureEvent } from '../../ui/input/gestures';
 import { MatchArt } from '../assets/matchArt';
 import { BUILDING_OVERHANG } from '../assets/procedural/buildings';
-import { TILESET_MARGIN, TILESET_SPACING, TILE_PX, tileFrame } from '../assets/tileset';
+import { TILE_PX } from '../assets/tileset';
+import { ART_RES } from '../assets/procedural/draw';
+import { GROUND_PAD, GROUND_PX, paintGround } from '../terrain/ground';
+import { TreeLayer } from '../terrain/trees';
+import { Ambience } from '../effects/Ambience';
 import { CameraModel } from '../camera/CameraModel';
 import { CONTEXT_KEY, type AppContext, type MatchStartData } from '../context';
 import { EntityRenderer } from '../entities/EntityRenderer';
@@ -48,7 +52,8 @@ export class WorldScene extends Phaser.Scene {
   private gestures!: GestureRecognizer;
   private pointer!: PointerInput;
   private art!: MatchArt;
-  private layer!: Phaser.Tilemaps.TilemapLayer;
+  private trees!: TreeLayer;
+  private ambience!: Ambience;
   private entities!: EntityRenderer;
   input2!: InputController;
   private card!: CommandCard;
@@ -89,6 +94,7 @@ export class WorldScene extends Phaser.Scene {
     this.fx = new EffectsRenderer(this, this.art);
     this.fx.particles = this.ctx.settings.graphics !== 'low';
     this.fogR = new FogRenderer(this, this.world);
+    this.ambience = new Ambience(this, this.world, this.ctx.settings.graphics);
     this.minimap = new Minimap(this.ctx.hud.minimapSlot, this.world, (x, y) =>
       this.centerOnTile(x, y),
     );
@@ -115,42 +121,33 @@ export class WorldScene extends Phaser.Scene {
     return this.sim.world;
   }
 
+  /** Paint the ground into chunk textures and plant the forests. */
   private buildTerrain(): void {
     const map = this.world.map;
-    const data: number[][] = [];
-    for (let y = 0; y < map.height; y++) {
-      const row: number[] = [];
-      for (let x = 0; x < map.width; x++) row.push(tileFrame(map, x, y));
-      data.push(row);
-    }
-    const tm = this.make.tilemap({ data, tileWidth: TILE_PX, tileHeight: TILE_PX });
-    const tileset = tm.addTilesetImage(
-      'tiles',
-      'tiles',
-      TILE_PX,
-      TILE_PX,
-      TILESET_MARGIN,
-      TILESET_SPACING,
-    );
-    if (!tileset) throw new Error('tileset missing');
-    const layer = tm.createLayer(0, tileset, 0, 0);
-    if (!layer) throw new Error('layer missing');
-    this.layer = layer.setDepth(-1);
+    for (let i = 0; this.textures.exists(`ground_${i}`); i++) this.textures.remove(`ground_${i}`);
+    paintGround(map).forEach((ch, i) => {
+      const key = `ground_${i}`;
+      this.textures.addCanvas(key, ch.canvas)?.setFilter(Phaser.Textures.FilterMode.LINEAR);
+      const k = TILE_PX / GROUND_PX;
+      this.add
+        .image(ch.tx * TILE_PX - GROUND_PAD * k, ch.ty * TILE_PX - GROUND_PAD * k, key)
+        .setOrigin(0, 0)
+        .setCrop(
+          GROUND_PAD,
+          GROUND_PAD,
+          ch.canvas.width - 2 * GROUND_PAD,
+          ch.canvas.height - 2 * GROUND_PAD,
+        )
+        .setScale(k)
+        .setDepth(-2);
+    });
+    this.trees = new TreeLayer(this, map);
+    this.trees.sway = this.ctx.settings.graphics !== 'low';
   }
 
-  /** A forest tile was cut down: redraw it and its neighbours (edge masks may change). */
+  /** A forest tile was cut down: fell its trees. */
   private refreshTile(i: number): void {
-    const map = this.world.map;
-    const x = i % map.width;
-    const y = Math.floor(i / map.width);
-    for (let dy = -1; dy <= 1; dy++) {
-      for (let dx = -1; dx <= 1; dx++) {
-        const nx = x + dx;
-        const ny = y + dy;
-        if (nx < 0 || ny < 0 || nx >= map.width || ny >= map.height) continue;
-        this.layer.putTileAt(tileFrame(map, nx, ny), nx, ny);
-      }
-    }
+    this.trees.removeTile(i);
   }
 
   private setupCamera(): void {
@@ -246,6 +243,17 @@ export class WorldScene extends Phaser.Scene {
     this.sim.enqueue(c);
   }
 
+  /**
+   * Advance the simulation instantly by `ticks` (dev/test helper used for staged screenshots and
+   * e2e checks). Visual events in between are skipped; trees are re-synced with the map.
+   */
+  fastForward(ticks: number): void {
+    for (let i = 0; i < ticks && this.world.winner < 0; i++) this.sim.step();
+    this.sim.drainEvents();
+    this.trees.sync();
+    this.minimap.markDirty();
+  }
+
   /** Fog state of the tile under a point for the local player (0 unexplored, 1 explored, 2 visible). */
   fogAt(x: number, y: number): number {
     const w = this.world.map.width;
@@ -295,6 +303,7 @@ export class WorldScene extends Phaser.Scene {
       this.ghostImg = this.add
         .image(0, 0, key, frame)
         .setOrigin(0, 0)
+        .setScale(1 / ART_RES)
         .setDepth(1e6 - 1);
     this.ghostImg
       .setTexture(key, frame)
@@ -395,6 +404,28 @@ export class WorldScene extends Phaser.Scene {
     const txt = `ms/frame sim ${f(p.sim)} ev ${f(p.events)} fx ${f(p.fx)} map ${f(p.mini)} ents ${f(p.ents)} hud ${f(p.hud)}`;
     p.sim = p.events = p.fx = p.mini = p.ents = p.hud = p.n = 0;
     return txt;
+  }
+
+  private nextAreaMotes = 0;
+
+  /** Lingering god-power areas shed particles (healing motes, embers, snowflakes). */
+  private areaMotes(time: number): void {
+    if (time < this.nextAreaMotes) return;
+    this.nextAreaMotes = time + 160;
+    for (const e of this.world.effects) {
+      if (e.until <= this.world.tick || e.kind === 'reveal' || this.fogAt(e.x, e.y) !== 2) continue;
+      const a = Math.random() * Math.PI * 2;
+      const r = Math.sqrt(Math.random()) * e.radius;
+      const color =
+        e.kind === 'heal'
+          ? 0x9cff9c
+          : e.kind === 'freeze'
+            ? 0xe6f4ff
+            : e.kind === 'slow'
+              ? 0xd8c385
+              : parseInt(powerDef(e.power).color.slice(1), 16);
+      this.fx.motes((e.x + Math.cos(a) * r) * TILE_PX, (e.y + Math.sin(a) * r) * TILE_PX, color, 3);
+    }
   }
 
   /** Map sim events to sound effects (only for things the player can perceive). */
@@ -682,7 +713,13 @@ export class WorldScene extends Phaser.Scene {
         const color = parseInt(d.color.slice(1), 16);
         const lang = getLanguage();
         if (ev.owner === ME || this.fogAt(ev.x, ev.y) === 2) {
-          if (d.kind === 'strike') this.fx.bolt(ev.x * TILE_PX, ev.y * TILE_PX, color);
+          if (d.kind === 'strike') {
+            this.fx.bolt(ev.x * TILE_PX, ev.y * TILE_PX, color);
+            this.cameras.main.shake(ev.owner === ME ? 260 : 140, ev.owner === ME ? 0.006 : 0.003);
+            if (ev.owner === ME) this.cameras.main.flash(90, 200, 200, 180, false);
+            this.fx.dustAt(ev.x * TILE_PX, ev.y * TILE_PX, 20);
+          }
+          this.fx.motes(ev.x * TILE_PX, ev.y * TILE_PX, color, 30);
           this.fx.burst(
             ev.x * TILE_PX,
             ev.y * TILE_PX,
@@ -700,6 +737,23 @@ export class WorldScene extends Phaser.Scene {
         this.showGameOver(ev.winner);
       } else if (ev.type === 'error' && ev.owner === ME) {
         this.ctx.hud.showInfo(t(`err.${ev.code}` as TranslationKey));
+      } else if (ev.type === 'built' && this.world.byId.get(ev.id)) {
+        const b = this.world.byId.get(ev.id)!;
+        if (this.fogAt(b.x, b.y) === 2) {
+          this.fx.dustAt(b.x * TILE_PX, (b.y + b.size / 2) * TILE_PX, 18);
+          this.fx.motes(b.x * TILE_PX, b.y * TILE_PX, 0xffd84a, 16);
+        }
+        if (ev.owner === ME)
+          this.ctx.hud.showInfo(
+            t('ev.built', { name: loc(buildingDef(ev.def).name, getLanguage()) }),
+          );
+      } else if (
+        ev.type === 'trained' &&
+        this.world.byId.get(ev.id) &&
+        this.fogAt(this.world.byId.get(ev.id)!.x, this.world.byId.get(ev.id)!.y) === 2
+      ) {
+        const u = this.world.byId.get(ev.id)!;
+        this.fx.motes(u.x * TILE_PX, u.y * TILE_PX, 0xfff3b0, 8);
       } else if (ev.type === 'built' && ev.owner === ME) {
         this.ctx.hud.showInfo(
           t('ev.built', { name: loc(buildingDef(ev.def).name, getLanguage()) }),
@@ -737,6 +791,9 @@ export class WorldScene extends Phaser.Scene {
       );
     }
     lap('mini');
+    this.trees.update(this.cameras.main.worldView, time);
+    this.ambience.update(dt, this.cameras.main.worldView, this.world.map);
+    this.areaMotes(time);
     this.entities.update(
       this.world,
       this.alpha,

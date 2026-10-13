@@ -45,3 +45,122 @@ export function createCanvas(w: number, h: number): [HTMLCanvasElement, CanvasRe
   if (!ctx) throw new Error('2D canvas not supported');
   return [c, ctx];
 }
+
+/**
+ * Texture pixels per world pixel for detailed sprites (units, buildings, trees, resources).
+ * Sprites are drawn at 2× and displayed at scale 1/ART_RES so they stay crisp when zoomed in.
+ */
+export const ART_RES = 2;
+
+/** Multiply an #rrggbb colour's channels by `f` (0.5 = darker, 1.3 = lighter). */
+export function shade(hex: string, f: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  const ch = (v: number): number => Math.min(255, Math.max(0, Math.round(v * f)));
+  const r = ch((n >> 16) & 255);
+  const g = ch((n >> 8) & 255);
+  const b = ch(n & 255);
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
+}
+
+/** Mix two #rrggbb colours (t = 0 → a, 1 → b). */
+export function mix(a: string, b: string, t: number): string {
+  const na = parseInt(a.slice(1), 16);
+  const nb = parseInt(b.slice(1), 16);
+  const l = (s: number): number => Math.round(((na >> s) & 255) * (1 - t) + ((nb >> s) & 255) * t);
+  return `#${((l(16) << 16) | (l(8) << 8) | l(0)).toString(16).padStart(6, '0')}`;
+}
+
+/** Vertical light-to-dark gradient for a shape spanning y0..y1. */
+export function vgrad(
+  c: CanvasRenderingContext2D,
+  y0: number,
+  y1: number,
+  color: string,
+  light = 1.22,
+  dark = 0.72,
+): CanvasGradient {
+  const g = c.createLinearGradient(0, y0, 0, y1);
+  g.addColorStop(0, shade(color, light));
+  g.addColorStop(0.55, color);
+  g.addColorStop(1, shade(color, dark));
+  return g;
+}
+
+/** Diagonal (top-left lit) gradient. */
+export function dgrad(
+  c: CanvasRenderingContext2D,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  color: string,
+): CanvasGradient {
+  const g = c.createLinearGradient(x0, y0, x1, y1);
+  g.addColorStop(0, shade(color, 1.3));
+  g.addColorStop(0.5, color);
+  g.addColorStop(1, shade(color, 0.65));
+  return g;
+}
+
+/** Radial highlight gradient (sphere-like shading) centred up-left of (x, y). */
+export function rgrad(
+  c: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  r: number,
+  color: string,
+): CanvasGradient {
+  const g = c.createRadialGradient(x - r * 0.35, y - r * 0.4, r * 0.1, x, y, r);
+  g.addColorStop(0, shade(color, 1.35));
+  g.addColorStop(0.6, color);
+  g.addColorStop(1, shade(color, 0.7));
+  return g;
+}
+
+/**
+ * Add a dark outline around the opaque pixels of `src` (classic readable RTS sprite look).
+ * Returns a new canvas of the same size (content must leave `width` px of margin).
+ */
+export function outlined(
+  src: HTMLCanvasElement,
+  width = 3,
+  color = 'rgba(28,20,14,0.92)',
+): HTMLCanvasElement {
+  const [sil, sc] = createCanvas(src.width, src.height);
+  sc.drawImage(src, 0, 0);
+  sc.globalCompositeOperation = 'source-in';
+  sc.fillStyle = color;
+  sc.fillRect(0, 0, sil.width, sil.height);
+  const [out, oc] = createCanvas(src.width, src.height);
+  const steps = 12;
+  for (let i = 0; i < steps; i++) {
+    const a = (i / steps) * Math.PI * 2;
+    oc.drawImage(sil, Math.cos(a) * width, Math.sin(a) * width);
+  }
+  oc.drawImage(src, 0, 0);
+  return out;
+}
+
+/** Soft blurred contact shadow ellipse. */
+export function softShadow(
+  c: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  rx: number,
+  ry: number,
+  alpha = 0.35,
+): void {
+  const g = c.createRadialGradient(x, y, 0, x, y, rx);
+  g.addColorStop(0, `rgba(10,14,8,${alpha})`);
+  g.addColorStop(0.7, `rgba(10,14,8,${alpha * 0.6})`);
+  g.addColorStop(1, 'rgba(10,14,8,0)');
+  c.save();
+  c.translate(x, y);
+  c.scale(1, ry / rx);
+  c.translate(-x, -y);
+  c.fillStyle = g;
+  c.beginPath();
+  c.arc(x, y, rx, 0, Math.PI * 2);
+  c.fill();
+  c.restore();
+}

@@ -154,7 +154,8 @@ function urlMatch(): MatchStartData | null {
       seed,
       mapSize,
       players: [
-        { faction, majorGod, ai: null },
+        // ?demo=1 lets the AI play our side too (attract mode / staged screenshots).
+        { faction, majorGod, ai: params.get('demo') ? 'normal' : null },
         {
           faction: aiFaction.id,
           majorGod: aiFaction.majorGods[seed % aiFaction.majorGods.length]!,

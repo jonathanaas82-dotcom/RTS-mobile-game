@@ -92,8 +92,14 @@ Change `GAME_NAME` in `src/config/game.ts`, plus `name`/`short_name` in
 ## Replacing placeholder art
 
 All textures are listed in `src/render/assets/manifest.ts`. Replace a `generate` entry with
-`url: 'assets/your-file.png'` (file in `public/assets/`). Keep the same key and dimensions; the
-terrain tileset must follow the layout in `src/render/assets/tileset.ts`.
+`url: 'assets/your-file.png'` (file in `public/assets/`). Keep the same key and dimensions.
+Unit/building art is drawn at `ART_RES`× resolution (`src/render/assets/procedural/draw.ts`) and
+displayed at `1/ART_RES` scale, so replacement sprites should be authored at that density.
+Terrain is painted per pixel into chunk textures (`src/render/terrain/ground.ts`) and forests are
+individual tree sprites (`src/render/terrain/trees.ts`).
+
+Preview all procedural art with `npm run build && node scripts/art-sheet.mjs` (contact sheets in
+`e2e-output/`) and capture staged gameplay screenshots with `node scripts/shots.mjs`.
 
 ## Adding a faction or unit
 

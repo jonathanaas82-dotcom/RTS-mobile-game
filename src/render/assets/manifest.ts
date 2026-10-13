@@ -1,29 +1,28 @@
-import { PALETTE } from './palette';
 import {
-  generateBanner,
   generateBerryBush,
+  generateGlint,
   generateGoldMine,
   generateRing,
+  generateSoft,
+  generateSpark,
 } from './procedural/features';
-import { generateTileset } from './procedural/tiles';
 
 /**
- * Asset manifest: the single list of every texture the game uses.
+ * Asset manifest: the list of shared textures the game uses.
  *
  * To replace placeholder art, change an entry from `generate` to `url` (put the file in
- * /public/assets). Keys, sizes and anchors stay the same so no game code changes.
- * The terrain tileset must follow the layout documented in `tileset.ts`.
+ * /public/assets). Keep the key and the texture-pixel scale (ART_RES = 2 for gold_mine and
+ * berry_bush). Per-match art (units, buildings in player colours, terrain, trees) is generated in
+ * `matchArt.ts`, `terrain/ground.ts` and `terrain/trees.ts`.
  */
 export type AssetEntry =
   { key: string; url: string } | { key: string; generate: () => HTMLCanvasElement };
 
 export const ASSETS: readonly AssetEntry[] = [
-  { key: 'tiles', generate: generateTileset },
   { key: 'gold_mine', generate: generateGoldMine },
   { key: 'berry_bush', generate: generateBerryBush },
   { key: 'ring', generate: generateRing },
-  ...PALETTE.players.map((color, i) => ({
-    key: `banner_${i}`,
-    generate: () => generateBanner(color),
-  })),
+  { key: 'spark', generate: generateSpark },
+  { key: 'soft', generate: generateSoft },
+  { key: 'glint', generate: generateGlint },
 ];

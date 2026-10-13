@@ -1,0 +1,170 @@
+// Staged gameplay screenshots. Starts AI-vs-AI ("demo") matches, fast-forwards the deterministic
+// simulation, then frames interesting moments in a phone-sized landscape viewport.
+// Usage: npm run build && node scripts/shots.mjs [namePrefix]   -> e2e-output/shot-*.png
+import { mkdirSync } from 'node:fs';
+import { preview } from 'vite';
+import { launchBrowser } from './browser.mjs';
+
+mkdirSync('e2e-output', { recursive: true });
+const server = await preview({ preview: { port: 4180, host: '127.0.0.1' }, logLevel: 'warn' });
+const base = server.resolvedUrls.local[0];
+const browser = await launchBrowser();
+const ctx = await browser.newContext({
+  viewport: { width: 844, height: 390 },
+  deviceScaleFactor: 2,
+  isMobile: true,
+  hasTouch: true,
+});
+const page = await ctx.newPage();
+page.on('pageerror', (e) => console.error('pageerror', String(e)));
+const only = process.argv[2];
+
+async function open(url) {
+  await page.goto(base + url);
+  await page.waitForFunction(() => window.__godforge?.ctx?.match != null, null, { timeout: 30000 });
+}
+
+async function shot(name, prep, wait = 1400) {
+  if (only && !name.startsWith(only)) return;
+  const info = await page.evaluate(prep);
+  await page.waitForTimeout(wait);
+  // Headless frames are slow, so a camera flash lingers far longer than on a device: clear it.
+  await page.evaluate(() =>
+    window.__godforge.game.scene.getScene('World').cameras.main.flashEffect.reset(),
+  );
+  await page.screenshot({ path: `e2e-output/shot-${name}.png` });
+  console.log('shot', name, info ?? '');
+}
+
+const run = only ? (n) => only.startsWith(n) || n.startsWith(only) : () => true;
+
+// ── Match 1: Hrimfolk (us, AI-driven) vs Aurelian League ──
+if (run('1')) {
+  await open('?play=1&demo=1&seed=valhollow&faction=hrimfolk&god=thunrak');
+  // Early base.
+  await shot('1-early-base', () => {
+    const s = window.__godforge.game.scene.getScene('World');
+    s.fastForward(20 * 150);
+    const st = s.sim.world.map.starts[0];
+    s.camModel.zoom = (50 * s.ctx.renderScale) / 64;
+    s.centerOnTile(st.x + 1.5, st.y + 1.5);
+    s.input2.selection.set(
+      s.sim.world.entities
+        .filter((e) => e.owner === 0 && e.cls === 'worker')
+        .slice(0, 3)
+        .map((e) => e.id),
+    );
+  });
+  // Mid-game town.
+  await shot('1-town', () => {
+    const s = window.__godforge.game.scene.getScene('World');
+    s.fastForward(20 * 330);
+    s.input2.selection.clear();
+    const st = s.sim.world.map.starts[0];
+    s.camModel.zoom = (36 * s.ctx.renderScale) / 64;
+    s.centerOnTile(st.x + 3, st.y + 3);
+    return `tick ${s.sim.world.tick}`;
+  });
+  // Find a battle: step until many units of both sides are close together, then frame it.
+  await shot(
+    '1-battle',
+    () => {
+      const s = window.__godforge.game.scene.getScene('World');
+      const w = s.sim.world;
+      let best = null;
+      for (let k = 0; k < 120 && !best; k++) {
+        s.fastForward(20 * 5);
+        const units = w.entities.filter(
+          (e) => e.kind === 'unit' && e.cls !== 'worker' && e.inside < 0,
+        );
+        for (const u of units) {
+          if (u.owner !== 0) continue;
+          const near = units.filter((o) => (o.x - u.x) ** 2 + (o.y - u.y) ** 2 < 36);
+          const foes = near.filter((o) => o.owner !== 0).length;
+          if (foes >= 4 && near.length >= 12) {
+            best = u;
+            break;
+          }
+        }
+      }
+      if (!best) return 'no battle';
+      // Reveal the fight for the shot and let it play out a little in real time.
+      for (let i = 0; i < w.fog[0].length; i++) if (w.fog[0][i] === 0) w.fog[0][i] = 1;
+      s.camModel.zoom = (44 * s.ctx.renderScale) / 64;
+      s.centerOnTile(best.x, best.y - 0.5);
+      s.input2.selection.set(
+        w.entities
+          .filter(
+            (e) =>
+              e.owner === 0 &&
+              e.kind === 'unit' &&
+              e.cls !== 'worker' &&
+              (e.x - best.x) ** 2 + (e.y - best.y) ** 2 < 49,
+          )
+          .map((e) => e.id),
+      );
+      return `tick ${w.tick}`;
+    },
+    1800,
+  );
+  // God power at the battle.
+  await shot(
+    '1-power',
+    () => {
+      const s = window.__godforge.game.scene.getScene('World');
+      const w = s.sim.world;
+      const foe = w.entities.find(
+        (e) =>
+          e.owner === 1 &&
+          e.kind === 'unit' &&
+          e.cls !== 'worker' &&
+          s.cameras.main.worldView.contains(e.x * 64, e.y * 64),
+      );
+      const p = w.players[0];
+      p.res.favor = 200;
+      const pw = p.powers[0];
+      pw.readyAt = 0;
+      if (foe) s.issue({ type: 'castPower', player: 0, power: pw.id, x: foe.x, y: foe.y });
+      return pw.id;
+    },
+    320,
+  );
+  // Strategic overview.
+  await shot('1-overview', () => {
+    const s = window.__godforge.game.scene.getScene('World');
+    const w = s.sim.world;
+    s.input2.selection.clear();
+    s.camModel.zoom = (16 * s.ctx.renderScale) / 64;
+    const st = w.map.starts[0];
+    s.centerOnTile(st.x + 12, st.y + 8);
+  });
+}
+
+// ── Match 2: Aurelian League town ──
+if (run('2')) {
+  await open('?play=1&demo=1&seed=marblebay&faction=aurelian&god=aetheon');
+  await shot('2-aurelian-town', () => {
+    const s = window.__godforge.game.scene.getScene('World');
+    s.fastForward(20 * 540);
+    const st = s.sim.world.map.starts[0];
+    s.camModel.zoom = (38 * s.ctx.renderScale) / 64;
+    s.centerOnTile(st.x + 2, st.y + 3);
+    return `tick ${s.sim.world.tick}`;
+  });
+}
+
+// ── Match 3: Sahrun Dominion town ──
+if (run('3')) {
+  await open('?play=1&demo=1&seed=sunreach&faction=sahrun&god=solenkh');
+  await shot('3-sahrun-town', () => {
+    const s = window.__godforge.game.scene.getScene('World');
+    s.fastForward(20 * 540);
+    const st = s.sim.world.map.starts[0];
+    s.camModel.zoom = (38 * s.ctx.renderScale) / 64;
+    s.centerOnTile(st.x + 2, st.y + 3);
+    return `tick ${s.sim.world.tick}`;
+  });
+}
+
+await browser.close();
+await server.close();

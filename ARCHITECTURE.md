@@ -56,8 +56,13 @@ tests/         Vitest unit tests (sim, input, camera, i18n)
 - **Units.** Sim positions are in **tiles** (floats). The renderer multiplies by `TILE_PX` (64).
 - **Data-driven.** Balance numbers live in `src/data`. Factions/units/gods are added as data.
 - **Art behind a manifest.** `src/render/assets/manifest.ts` lists every texture; entries are
-  procedurally generated now and can point to files later without code changes. The terrain
-  tileset follows the layout contract in `src/render/assets/tileset.ts`.
+  procedurally generated now and can point to files later without code changes. Sprites are
+  drawn at `ART_RES`× density with outlines and soft shadows and displayed at `1/ART_RES`.
+- **Painted terrain.** `render/terrain/ground.ts` blends blurred terrain indicator fields with
+  noise into 16×16-tile chunk textures (padded by a pixel to avoid seams under linear filtering);
+  `render/terrain/trees.ts` turns forest tiles into depth-sorted, culled, swaying tree sprites.
+  Fog (`FogRenderer`), cloud shadows and water glints (`Ambience`) are purely cosmetic and never
+  touch sim state.
 - **Real time.** The sim is driven by Phaser's `rawDelta` (unsmoothed); Phaser's capped `delta`
   would slow the match on a struggling device.
 

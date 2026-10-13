@@ -4,6 +4,10 @@ import type { World } from '../../sim/world';
 import { BUILDING_OVERHANG } from '../assets/procedural/buildings';
 import type { MatchArt } from '../assets/matchArt';
 import { TILE_PX } from '../assets/tileset';
+import { ART_RES } from '../assets/procedural/draw';
+import { PALETTE } from '../assets/palette';
+
+const TEAM = PALETTE.players.map((c) => parseInt(c.slice(1), 16));
 
 const CARRY_COLORS: Record<string, number> = {
   food: 0xe04858,
@@ -83,18 +87,29 @@ export class EntityRenderer {
       const s = v.sprite;
       if (e.kind === 'unit') {
         const moving = e.x !== e.px || e.y !== e.py;
-        const bob = moving ? -Math.abs(Math.sin(time * 0.018 + e.id)) * 4 : 0;
+        const step = Math.sin(time * 0.018 + e.id);
+        const bob = moving ? -Math.abs(step) * 4 : 0;
         const sinceAttack = tick - e.lastAttack;
         const lunge = sinceAttack >= 0 && sinceAttack < 3 ? e.facing * (3 - sinceAttack) * 3 : 0;
         s.setPosition(x + lunge, y + bob);
         s.setFlipX(e.facing < 0);
+        // Walking sway and a forward lean while striking.
+        s.setAngle((moving ? step * 4 : 0) + (lunge !== 0 ? e.facing * 6 : 0));
         s.setDepth(y);
+        // Team-coloured footprint ring for readability in crowds.
+        rings.fillStyle(TEAM[e.owner] ?? 0xffffff, 0.28);
+        rings.fillEllipse(x, y + 1, e.radius * TILE_PX * 2.1, e.radius * TILE_PX * 0.9);
         if (e.stunUntil > tick) s.setTint(0xb8e0ff);
         else if (tick - e.lastHit < 3) s.setTint(0xff9090);
         else s.clearTint();
         if (selected.has(e.id)) {
-          rings.lineStyle(3, e.owner === 0 ? 0x7cf29c : 0xff6b6b, 0.95);
-          rings.strokeEllipse(x, y + 2, e.radius * TILE_PX * 2.4, e.radius * TILE_PX * 1.1);
+          const rw = e.radius * TILE_PX * 2.6;
+          const rh = e.radius * TILE_PX * 1.2;
+          const col = e.owner === 0 ? 0x7cf29c : 0xff6b6b;
+          rings.lineStyle(6, col, 0.25);
+          rings.strokeEllipse(x, y + 2, rw + 4, rh + 3);
+          rings.lineStyle(2.5, col, 1);
+          rings.strokeEllipse(x, y + 2, rw, rh);
         }
         if (selected.has(e.id) || e.hp < e.maxHp)
           this.bar(bars, x, y - s.displayHeight * 0.85, e, 34);
@@ -105,6 +120,18 @@ export class EntityRenderer {
           bars.fillCircle(x - e.facing * 9, cy, 5);
           bars.lineStyle(1.5, 0x2b2116, 1);
           bars.strokeCircle(x - e.facing * 9, cy, 5);
+        }
+      } else if (e.kind === 'resource') {
+        s.setPosition(x, y);
+        s.setDepth(y + (e.size * TILE_PX) / 4);
+        if (selected.has(e.id)) {
+          rings.lineStyle(2.5, 0xf3e6c4, 0.9);
+          rings.strokeEllipse(
+            x,
+            y + (e.size * TILE_PX) / 4,
+            e.size * TILE_PX * 0.95,
+            e.size * TILE_PX * 0.5,
+          );
         }
       } else {
         s.setPosition(
@@ -121,7 +148,10 @@ export class EntityRenderer {
             s.setAlpha(0.9);
             if (!v.base) {
               const [key, frame] = this.art.frame(`found:${Math.min(3, e.size)}`);
-              v.base = this.scene.add.image(0, 0, key, frame).setOrigin(0, 0);
+              v.base = this.scene.add
+                .image(0, 0, key, frame)
+                .setOrigin(0, 0)
+                .setScale(1 / ART_RES);
             }
             v.base
               .setPosition(x - (e.size * TILE_PX) / 2, y - (e.size * TILE_PX) / 2)
@@ -160,9 +190,10 @@ export class EntityRenderer {
 
   private bar(g: Phaser.GameObjects.Graphics, cx: number, y: number, e: Entity, w: number): void {
     const frac = e.kind === 'building' && !e.built ? e.progress : Math.max(0, e.hp / e.maxHp);
-    const h = 6;
-    g.fillStyle(0x000000, 0.6);
-    g.fillRect(cx - w / 2 - 1, y - 1, w + 2, h + 2);
+    const h = 7;
+    const x0 = cx - w / 2;
+    g.fillStyle(0x140e08, 0.75);
+    g.fillRoundedRect(x0 - 2, y - 2, w + 4, h + 4, 4);
     const color =
       e.kind === 'building' && !e.built
         ? 0xf0cf72
@@ -171,8 +202,16 @@ export class EntityRenderer {
           : frac > 0.3
             ? 0xf2c14e
             : 0xe5484d;
-    g.fillStyle(color, 1);
-    g.fillRect(cx - w / 2, y, w * frac, h);
+    if (frac > 0.02) {
+      g.fillStyle(color, 1);
+      g.fillRoundedRect(x0, y, Math.max(4, w * frac), h, 3);
+      // Glossy highlight.
+      g.fillStyle(0xffffff, 0.3);
+      g.fillRoundedRect(x0 + 1, y + 1, Math.max(2, w * frac - 2), 2, 1);
+    }
+    // Team marker at the left end.
+    g.fillStyle(TEAM[e.owner] ?? 0xffffff, 1);
+    g.fillCircle(x0 - 3, y + h / 2, 3.5);
   }
 
   private frameFor(e: Entity): string {
@@ -190,15 +229,20 @@ export class EntityRenderer {
     if (e.kind === 'resource') {
       const key = e.def === 'gold' ? 'gold_mine' : 'berry_bush';
       sprite = sprite ? sprite.setTexture(key) : this.scene.add.image(0, 0, key);
-      // Resources reuse the building positioning maths: no overhang in their texture.
-      sprite.setOrigin(0, -BUILDING_OVERHANG / e.size);
+      sprite.setOrigin(0.5, 0.5);
     } else {
       const [key, frame] = this.art.frame(name);
       sprite = sprite ? sprite.setTexture(key, frame) : this.scene.add.image(0, 0, key, frame);
-      if (e.kind === 'unit') sprite.setOrigin(0.5, 0.85);
+      if (e.kind === 'unit') sprite.setOrigin(0.5, 0.86);
       else sprite.setOrigin(0, 0);
     }
-    sprite.setVisible(true).setAlpha(1).clearTint().setCrop();
+    sprite
+      .setVisible(true)
+      .setAlpha(1)
+      .clearTint()
+      .setCrop()
+      .setAngle(0)
+      .setScale(1 / ART_RES);
     v = { sprite, base: null, frameName: name, seen: 0 };
     this.views.set(e.id, v);
     return v;

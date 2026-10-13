@@ -1,0 +1,33 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Art preview</title>
+    <style>
+      body {
+        margin: 0;
+        background: #5e9b47;
+        font: 12px system-ui;
+        color: #fff;
+      }
+      .sheet {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        padding: 8px;
+        align-items: flex-end;
+      }
+      figure {
+        margin: 0;
+        text-align: center;
+      }
+      canvas {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="out" class="sheet"></div>
+    <script type="module" src="./art-preview.ts"></script>
+  </body>
+</html>
