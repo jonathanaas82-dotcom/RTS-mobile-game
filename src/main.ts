@@ -1,6 +1,8 @@
 import './ui/styles.css';
 import { GAME_NAME } from './config/game';
 import { MAP_SIZES } from './data/balance/map';
+import { FACTIONS, factionDef } from './data';
+import type { FactionId } from './data/types';
 import { setLanguage, t, type TranslationKey } from './i18n';
 import { registerServiceWorker, suppressBrowserGestures } from './platform/pwa';
 import type { AppContext } from './render/context';
@@ -41,12 +43,25 @@ const ctx: AppContext = {
 };
 hud.attach(ctx);
 
+// Faction / god / difficulty can be forced from the URL until the pre-match screen (M8).
+const factionParam = (params.get('faction') ?? 'hrimfolk') as FactionId;
+const faction = FACTIONS.some((f) => f.id === factionParam) ? factionParam : 'hrimfolk';
+const majorParam = params.get('god');
+const majorGod =
+  majorParam && factionDef(faction).majorGods.includes(majorParam)
+    ? majorParam
+    : factionDef(faction).majorGods[0]!;
+const aiFaction = FACTIONS.find((f) => f.id !== faction)!;
 const match: MatchConfig = {
   seed,
   mapSize,
   players: [
-    { faction: 'hrimfolk', majorGod: 'thunrak', ai: null },
-    { faction: 'aurelian', majorGod: 'aetheon', ai: 'normal' },
+    { faction, majorGod, ai: null },
+    {
+      faction: aiFaction.id,
+      majorGod: aiFaction.majorGods[seed % aiFaction.majorGods.length]!,
+      ai: 'normal',
+    },
   ],
 };
 const game = createGame(document.getElementById('game') as HTMLElement, ctx, match);

@@ -92,6 +92,8 @@ export const en = {
   'pantheon.major': 'Major god',
   'pantheon.favor': 'Favor',
   'age.power': 'God power',
+  'ev.enemyPower': 'The enemy invoked {name}!',
+  'ev.boost': '{name} is active',
   'cmd.stop': 'Stop',
   'terrain.0': 'Grass',
   'terrain.1': 'Sand',

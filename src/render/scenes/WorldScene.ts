@@ -522,6 +522,25 @@ export class WorldScene extends Phaser.Scene {
         if (this.ctx.settings.haptics) haptic([30, 50, 60]);
       } else if (ev.type === 'ageUp' && ev.owner !== ME) {
         this.ctx.hud.showInfo(t('ev.enemyAge', { age: loc(AGES[ev.age]!.name, getLanguage()) }));
+      } else if (ev.type === 'power') {
+        const d = powerDef(ev.power);
+        const color = parseInt(d.color.slice(1), 16);
+        const lang = getLanguage();
+        if (ev.owner === ME || this.fogAt(ev.x, ev.y) === 2) {
+          if (d.kind === 'strike') this.fx.bolt(ev.x * TILE_PX, ev.y * TILE_PX, color);
+          this.fx.burst(
+            ev.x * TILE_PX,
+            ev.y * TILE_PX,
+            Math.max(2, d.radius),
+            color,
+            d.kind === 'strike' ? 600 : 900,
+          );
+          if (ev.owner !== ME)
+            this.ctx.hud.showInfo(t('ev.enemyPower', { name: loc(d.name, lang) }));
+          else if (d.kind === 'boost')
+            this.ctx.hud.showInfo(t('ev.boost', { name: loc(d.name, lang) }));
+          if (this.ctx.settings.haptics) haptic(d.kind === 'strike' ? [20, 30, 60] : 25);
+        }
       } else if (ev.type === 'gameOver') {
         this.showGameOver(ev.winner);
       } else if (ev.type === 'error' && ev.owner === ME) {

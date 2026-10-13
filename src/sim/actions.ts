@@ -4,6 +4,7 @@ import { formationSlots, moveTo, stopMoving } from './systems/movement';
 import type { World } from './world';
 import { attackDefOf } from './systems/combat';
 import { useAbility } from './systems/abilities';
+import { castPower } from './systems/powers';
 import { checkWinner, defeat } from './systems/victory';
 
 /** Own, living units from a command's id list (in a stable order). */
@@ -86,6 +87,9 @@ export function applyMovementCommand(world: World, c: Command): boolean {
       if (h && !h.dead && h.owner === c.player && h.cls === 'hero') useAbility(world, h);
       return true;
     }
+    case 'castPower':
+      castPower(world, c.player, c.power, c.x, c.y);
+      return true;
     case 'resign':
       defeat(world, c.player);
       checkWinner(world);

@@ -94,6 +94,8 @@ export const nb: Partial<Record<TranslationKey, string>> = {
   'pantheon.major': 'Hovedgud',
   'pantheon.favor': 'Gunst',
   'age.power': 'Gudekraft',
+  'ev.enemyPower': 'Fienden påkalte {name}!',
+  'ev.boost': '{name} er aktiv',
   'cmd.stop': 'Stopp',
   'terrain.0': 'Gress',
   'terrain.1': 'Sand',

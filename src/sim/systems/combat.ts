@@ -32,10 +32,12 @@ export function applyDamage(
   src: { owner: number; cls: UnitClass; entity: Entity | null },
   target: Entity,
   base: number,
+  /** God powers ignore the counter matrix (but not armor). */
+  raw = false,
 ): number {
   if (target.dead || target.kind === 'resource') return 0;
   const tCls: UnitClass = target.kind === 'building' ? 'building' : (target.cls as UnitClass);
-  let dmg = base * counterMultiplier(src.cls, tCls);
+  let dmg = raw ? base : base * counterMultiplier(src.cls, tCls);
   if (src.entity && src.entity.buffUntil > world.tick) dmg *= 1.25;
   const baseArmor =
     target.kind === 'unit' ? unitDef(target.def).armor : buildingDef(target.def).armor;

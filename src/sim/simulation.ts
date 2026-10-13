@@ -7,6 +7,7 @@ import { productionSystem } from './systems/production';
 import { combatSystem } from './systems/combat';
 import { fogSystem, updateFog } from './systems/fog';
 import { victorySystem } from './systems/victory';
+import { favorSystem, powerEffectsSystem } from './systems/powers';
 import { cleanupDead, createWorld, type MatchConfig, type SimEvent, type World } from './world';
 
 /** A system advances one aspect of the world by exactly one tick. Systems run in array order. */
@@ -21,6 +22,8 @@ export interface Controller {
 export const DEFAULT_SYSTEMS: System[] = [
   orderSystem,
   combatSystem,
+  powerEffectsSystem,
+  favorSystem,
   productionSystem,
   pathSystem,
   movementSystem,

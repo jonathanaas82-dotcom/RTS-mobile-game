@@ -326,6 +326,33 @@ try {
   });
   check(fought, 'units fight when enemies meet');
 
+  // --- M6: cast the major god's power through the power bar + map tap.
+  await page.evaluate(
+    () => (window.__godforge.game.scene.getScene('World').sim.world.players[0].res.favor = 100),
+  );
+  await page.waitForTimeout(300);
+  await page.locator('.power-btn').first().tap();
+  await page.waitForTimeout(200);
+  check(await page.locator('.hud-banner').isVisible(), 'power targeting banner shown');
+  const target = await page.evaluate(() => {
+    const w = window.__godforge.game.scene.getScene('World').sim.world;
+    const foe = w.entities.find((e) => e.owner === 1 && e.kind === 'unit' && !e.dead);
+    if (foe) window.__godforge.game.scene.getScene('World').centerOnTile(foe.x, foe.y);
+    return foe ? [foe.x, foe.y] : null;
+  });
+  await page.waitForTimeout(100);
+  const [px, py] = target ? await toScreen(target[0], target[1]) : [422, 200];
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (!(await page.locator('.hud-banner').isVisible())) break;
+    await tapAt(px, py);
+  }
+  await page.waitForTimeout(150);
+  await page.screenshot({ path: `${OUT}/04b-power.png` });
+  const favorLeft = await page.evaluate(
+    () => window.__godforge.game.scene.getScene('World').sim.world.players[0].res.favor,
+  );
+  check(favorLeft < 100, `casting spends favor (${favorLeft.toFixed(0)} left)`);
+
   // --- Menu button pauses with a modal.
   await page.locator('.hud-controls .hud-btn').first().tap();
   await page.waitForTimeout(150);
@@ -413,6 +440,22 @@ try {
   await page.waitForTimeout(300);
   check(await page.locator('#rotate').isVisible(), 'portrait shows rotate prompt');
   await page.screenshot({ path: `${OUT}/04-portrait.png` });
+
+  // --- Every faction loads and renders.
+  for (const f of ['aurelian', 'sahrun']) {
+    await page.setViewportSize({ width: 844, height: 390 });
+    await page.goto(`${base}?seed=7&faction=${f}`);
+    await page.waitForFunction(() => window.__godforge?.ctx?.match != null, null, {
+      timeout: 20000,
+    });
+    await page.waitForTimeout(800);
+    const ok = await page.evaluate(
+      (fac) => window.__godforge.game.scene.getScene('World').sim.world.players[0].faction === fac,
+      f,
+    );
+    check(ok, `${f} faction starts`);
+    await page.screenshot({ path: `${OUT}/06-${f}.png` });
+  }
 
   check(errors.length === 0, `no console errors${errors.length ? ': ' + errors.join(' | ') : ''}`);
 } catch (e) {

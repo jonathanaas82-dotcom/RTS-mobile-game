@@ -146,6 +146,34 @@ export class EffectsRenderer {
     });
   }
 
+  /** Jagged lightning bolt from the sky to a point. */
+  bolt(x: number, y: number, color: number): void {
+    const g = this.scene.add.graphics().setDepth(4.5e5);
+    const pts: Array<[number, number]> = [];
+    let cx = x + 60;
+    for (let k = 0; k <= 8; k++) {
+      const yy = y - 520 + k * 65;
+      cx += ((k * 37) % 5) * 9 - 18;
+      pts.push([k === 8 ? x : cx, yy]);
+    }
+    const draw = (a: number): void => {
+      g.clear();
+      g.lineStyle(10, color, 0.35 * a);
+      g.strokePoints(pts.map(([px, py]) => ({ x: px, y: py })));
+      g.lineStyle(4, 0xffffff, a);
+      g.strokePoints(pts.map(([px, py]) => ({ x: px, y: py })));
+    };
+    draw(1);
+    const st = { a: 1 };
+    this.scene.tweens.add({
+      targets: st,
+      a: 0,
+      duration: 450,
+      onUpdate: () => draw(st.a),
+      onComplete: () => g.destroy(),
+    });
+  }
+
   private floater(x: number, y: number, s: string, color: string): void {
     let fl = this.floaters.find((f) => !f.text.visible);
     if (!fl) {
