@@ -82,6 +82,12 @@ export const en = {
   'err.cooldown': 'Still recharging',
   'ev.built': '{name} completed',
   'ev.researched': 'Researched {name}',
+  'end.victory': 'Victory!',
+  'end.defeat': 'Defeat',
+  'end.stats':
+    'Time {time}\nUnits trained {trained} · killed {killed} · lost {lost}\nBuildings built {built} · resources gathered {gathered}',
+  'end.again': 'Play again',
+  'end.menu': 'Main menu',
   'cmd.stop': 'Stop',
   'terrain.0': 'Grass',
   'terrain.1': 'Sand',

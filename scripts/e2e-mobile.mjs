@@ -272,6 +272,32 @@ try {
   await page.evaluate(() => window.__godforge.ctx.match.setSpeed(1));
   await page.screenshot({ path: `${OUT}/03d-townhall.png` });
 
+  // --- M4: a staged skirmish near our base shows combat, projectiles and damage numbers.
+  check(await page.locator('.hud-minimap canvas').isVisible(), 'minimap is shown');
+  await page.evaluate(() => {
+    const s = window.__godforge.game.scene.getScene('World');
+    const w = s.sim.world;
+    const st = w.map.starts[0];
+    const ti = w.grid.nearestWalkable(st.x + 6, st.y + 5);
+    const x = (ti % w.map.width) + 0.5;
+    const y = Math.floor(ti / w.map.width) + 0.5;
+    const mk = (owner, def, dx, dy) => window.__godforge.spawn(owner, def, x + dx, y + dy);
+    for (let i = 0; i < 4; i++) mk(0, 'shieldbrother', -1.5, i * 0.6 - 1);
+    for (let i = 0; i < 3; i++) mk(0, 'ravenbow', -2.5, i * 0.6 - 0.6);
+    for (let i = 0; i < 4; i++) mk(1, 'lancer', 2, i * 0.7 - 1);
+    s.centerOnTile(x, y);
+  });
+  await page.waitForTimeout(2500);
+  await page.screenshot({ path: `${OUT}/04-battle.png` });
+  const fought = await page.evaluate(() => {
+    const w = window.__godforge.game.scene.getScene('World').sim.world;
+    return (
+      w.entities.some((e) => e.kind === 'unit' && e.hp < e.maxHp) ||
+      w.entities.filter((e) => e.def === 'lancer').length < 4
+    );
+  });
+  check(fought, 'units fight when enemies meet');
+
   // --- Menu button pauses with a modal.
   await page.locator('.hud-controls .hud-btn').first().tap();
   await page.waitForTimeout(150);
@@ -313,6 +339,30 @@ try {
     window.visualViewport?.scale ?? 1,
   ]);
   check(scroll[0] === 0 && scroll[1] === 0 && scroll[2] === 1, 'page did not scroll or zoom');
+
+  // --- Victory: wipe the enemy and expect the end-of-match screen, then restart.
+  await page.evaluate(() => {
+    const w = window.__godforge.game.scene.getScene('World').sim.world;
+    for (const e of w.entities)
+      if (e.owner === 1) {
+        e.hp = 0;
+        e.dead = true;
+        if (e.kind !== 'unit') w.grid.unstamp(e);
+      }
+  });
+  await page.waitForTimeout(2500);
+  const endText = await page
+    .locator('.modal-title')
+    .textContent()
+    .catch(() => '');
+  check(/Victory/.test(endText ?? ''), `victory screen shown ("${endText}")`);
+  await page.screenshot({ path: `${OUT}/05-victory.png` });
+  await page.locator('.modal-actions .btn-primary').tap();
+  await page.waitForTimeout(2500);
+  const fresh = await page.evaluate(
+    () => window.__godforge.game.scene.getScene('World').sim.world.tick,
+  );
+  check(fresh < 200, `play again starts a new match (tick ${fresh})`);
 
   // --- Frame rate sample (software GL in CI is much slower than a phone; informative only).
   const fps = await page.evaluate(() => window.__godforge.game.loop.actualFps);

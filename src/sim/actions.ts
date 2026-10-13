@@ -2,6 +2,9 @@ import type { Command } from './commands';
 import { idleOrder, type Entity } from './entity';
 import { formationSlots, moveTo, stopMoving } from './systems/movement';
 import type { World } from './world';
+import { attackDefOf } from './systems/combat';
+import { useAbility } from './systems/abilities';
+import { checkWinner, defeat } from './systems/victory';
 
 /** Own, living units from a command's id list (in a stable order). */
 export function ownUnits(world: World, player: number, ids: number[]): Entity[] {
@@ -66,6 +69,26 @@ export function applyMovementCommand(world: World, c: Command): boolean {
     case 'move':
     case 'attackMove':
       groupMove(world, ownUnits(world, c.player, c.ids), c.x, c.y, c.type);
+      return true;
+    case 'attack': {
+      const target = world.byId.get(c.target);
+      if (!target || target.dead || target.owner === c.player || target.owner < 0) return true;
+      for (const u of ownUnits(world, c.player, c.ids)) {
+        if (!attackDefOf(u)) continue;
+        setOrder(u, 'attack', target.x, target.y, target.id);
+        u.repathAt = 0;
+        stopMoving(u);
+      }
+      return true;
+    }
+    case 'ability': {
+      const h = world.byId.get(c.id);
+      if (h && !h.dead && h.owner === c.player && h.cls === 'hero') useAbility(world, h);
+      return true;
+    }
+    case 'resign':
+      defeat(world, c.player);
+      checkWinner(world);
       return true;
     case 'stop':
       for (const u of ownUnits(world, c.player, c.ids)) {

@@ -1,6 +1,6 @@
 import type { Settings } from '../ui/settings';
 
-import type { MatchConfig } from '../sim/world';
+import type { MatchConfig, World } from '../sim/world';
 import type { Hud } from '../ui/hud/Hud';
 
 /** What the world scene reports to the HUD. Implemented by the DOM HUD (src/ui/hud). */
@@ -40,6 +40,10 @@ export interface AppContext {
   hud: HudPort;
   /** Filled in by WorldScene when a match starts. */
   match: MatchControls | null;
+  /** App-level navigation (set by main.ts). */
+  restart?: () => void;
+  toMenu?: () => void;
+  onMatchEnd?: (won: boolean, world: World) => void;
 }
 
 export const CONTEXT_KEY = 'appContext';

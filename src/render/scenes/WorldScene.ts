@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { buildingDef, godDef, loc, techDef } from '../../data';
+import { buildingDef, godDef, loc, powerDef, techDef } from '../../data';
 import { AGES } from '../../data/factions';
 import { SIM, TICK_MS } from '../../data/balance/sim';
 import { getLanguage, t, type TranslationKey } from '../../i18n';
@@ -20,6 +20,9 @@ import { CONTEXT_KEY, type AppContext, type MatchStartData } from '../context';
 import { EntityRenderer } from '../entities/EntityRenderer';
 import { InputController, type InputHost } from '../input/InputController';
 import { PointerInput } from '../input/PointerInput';
+import { EffectsRenderer } from '../effects/EffectsRenderer';
+import { FogRenderer } from '../effects/FogRenderer';
+import { Minimap } from '../Minimap';
 
 /** On-screen size of one tile in CSS px at default / min / max zoom. */
 const TILE_CSS_DEFAULT = 46;
@@ -50,6 +53,11 @@ export class WorldScene extends Phaser.Scene {
   private nextHudAt = 0;
   private alpha = 0;
   private alertPos: { x: number; y: number } | null = null;
+  private fogR!: FogRenderer;
+  private fx!: EffectsRenderer;
+  private minimap!: Minimap;
+  private nextMinimapAt = 0;
+  private gameOverShown = false;
 
   constructor() {
     super('World');
@@ -66,6 +74,12 @@ export class WorldScene extends Phaser.Scene {
     this.art = new MatchArt(this.textures, data.players);
     this.buildTerrain();
     this.entities = new EntityRenderer(this, this.art);
+    this.fx = new EffectsRenderer(this, this.art);
+    this.fx.particles = this.ctx.settings.graphics !== 'low';
+    this.fogR = new FogRenderer(this, this.world);
+    this.minimap = new Minimap(this.ctx.hud.minimapSlot, this.world, (x, y) =>
+      this.centerOnTile(x, y),
+    );
     this.setupCamera();
     this.setupInput();
     this.exposeControls();
@@ -190,7 +204,7 @@ export class WorldScene extends Phaser.Scene {
       }),
       slopTiles: () => (22 * rs()) / (this.camModel.zoom * TILE_PX),
       visible: (e) => this.isVisible(e),
-      explored: () => true,
+      explored: (tx, ty) => (this.world.fog[ME]?.[ty * this.world.map.width + tx] ?? 0) > 0,
       marker: (x, y, kind) =>
         this.ring(
           x * TILE_PX,
@@ -212,9 +226,20 @@ export class WorldScene extends Phaser.Scene {
     this.sim.enqueue(c);
   }
 
-  /** Entities hidden by fog of war are not drawn or pickable (M4 adds the fog). */
-  isVisible(_e: Entity): boolean {
-    return true;
+  /** Fog state of the tile under a point for the local player (0 unexplored, 1 explored, 2 visible). */
+  fogAt(x: number, y: number): number {
+    const w = this.world.map.width;
+    const tx = Math.floor(x);
+    const ty = Math.floor(y);
+    if (tx < 0 || ty < 0 || tx >= w || ty >= this.world.map.height) return 0;
+    return this.world.fog[ME]?.[ty * w + tx] ?? 2;
+  }
+
+  /** Own things are always visible; enemy units need vision; buildings/resources once explored. */
+  isVisible(e: Entity): boolean {
+    if (e.owner === ME) return true;
+    const f = this.fogAt(e.x, e.y);
+    return e.kind === 'unit' ? f === 2 : f > 0;
   }
 
   private cameraGesture(e: GestureEvent): void {
@@ -353,6 +378,35 @@ export class WorldScene extends Phaser.Scene {
     };
   }
 
+  private showGameOver(winner: number): void {
+    if (this.gameOverShown) return;
+    this.gameOverShown = true;
+    const p = this.world.players[ME]!;
+    const won = winner === ME;
+    const secs = Math.floor(this.world.tick / SIM.ticksPerSecond);
+    const time = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+    const s = p.stats;
+    this.ctx.onMatchEnd?.(won, this.world);
+    this.time.delayedCall(won ? 600 : 1200, () => {
+      this.loop.paused = true;
+      this.ctx.hud.showModal({
+        title: won ? t('end.victory') : t('end.defeat'),
+        body: t('end.stats', {
+          time,
+          trained: s.unitsTrained,
+          killed: s.unitsKilled,
+          lost: s.unitsLost,
+          built: s.buildingsBuilt,
+          gathered: Math.floor(s.gathered),
+        }),
+        actions: [
+          { label: t('end.again'), primary: true, onPress: () => this.ctx.restart?.() },
+          { label: t('end.menu'), onPress: () => this.ctx.toMenu?.() },
+        ],
+      });
+    });
+  }
+
   /** Expanding ring feedback, pooled to avoid allocations on every tap. */
   ring(x: number, y: number, tint: number): void {
     let img = this.rings.find((r) => !r.visible);
@@ -416,8 +470,26 @@ export class WorldScene extends Phaser.Scene {
     this.applyCamera();
     this.alpha = this.loop.advance(dt);
     for (const ev of this.sim.drainEvents()) {
-      if (ev.type === 'treeCut') this.refreshTile(ev.tile);
-      else if (ev.type === 'error' && ev.owner === ME) {
+      this.fx.onEvent(
+        ev,
+        ME,
+        (x, y) => this.fogAt(x, y) === 2,
+        (x, y) => this.cameras.main.worldView.contains(x * TILE_PX, y * TILE_PX),
+      );
+      if (ev.type === 'treeCut') {
+        this.refreshTile(ev.tile);
+        this.minimap.markDirty();
+      } else if (ev.type === 'ability' && this.fogAt(ev.x, ev.y) === 2) {
+        this.fx.burst(
+          ev.x * TILE_PX,
+          ev.y * TILE_PX,
+          3,
+          ev.kind === 'thunderclap' ? 0xcfe8ff : 0xfff3b0,
+          500,
+        );
+      } else if (ev.type === 'gameOver') {
+        this.showGameOver(ev.winner);
+      } else if (ev.type === 'error' && ev.owner === ME) {
         this.ctx.hud.showInfo(t(`err.${ev.code}` as TranslationKey));
       } else if (ev.type === 'built' && ev.owner === ME) {
         this.ctx.hud.showInfo(
@@ -430,10 +502,25 @@ export class WorldScene extends Phaser.Scene {
       } else if (ev.type === 'underAttack' && ev.owner === ME) {
         this.alertPos = { x: ev.x, y: ev.y };
         this.ctx.hud.alert();
+        this.minimap.flash(ev.x, ev.y, this.time.now);
         if (this.ctx.settings.haptics) haptic([40, 60, 40]);
       }
     }
     this.input2.update();
+    this.fogR.update(this.world, ME);
+    const vis = (x: number, y: number): boolean => this.fogAt(x, y) === 2;
+    this.fx.update(this.world, this.alpha, vis);
+    this.fx.drawAreas(this.world, vis, (power) => parseInt(powerDef(power).color.slice(1), 16));
+    if (time >= this.nextMinimapAt) {
+      this.nextMinimapAt = time + 250;
+      const v = this.cameras.main.worldView;
+      this.minimap.draw(
+        this.world,
+        ME,
+        { x: v.x / TILE_PX, y: v.y / TILE_PX, w: v.width / TILE_PX, h: v.height / TILE_PX },
+        time,
+      );
+    }
     this.entities.update(
       this.world,
       this.alpha,

@@ -6,7 +6,7 @@ import { registerServiceWorker, suppressBrowserGestures } from './platform/pwa';
 import type { AppContext } from './render/context';
 import { createGame } from './render/game';
 import { hashSeed } from './sim/core/rng';
-import type { MatchConfig } from './sim/world';
+import { spawnUnit, type MatchConfig, type World } from './sim/world';
 import { Hud } from './ui/hud/Hud';
 import { loadSettings, maxPixelRatio } from './ui/settings';
 
@@ -50,6 +50,12 @@ const match: MatchConfig = {
   ],
 };
 const game = createGame(document.getElementById('game') as HTMLElement, ctx, match);
+ctx.restart = () => {
+  hud.showModal(null);
+  game.scene.stop('World');
+  game.scene.start('World', { ...match, seed: (match.seed * 1664525 + 1013904223) >>> 0 });
+};
+ctx.toMenu = ctx.restart;
 
 // Auto-pause when the app is backgrounded (phone call, app switch).
 document.addEventListener('visibilitychange', () => {
@@ -57,4 +63,12 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // Exposed for e2e tests and debugging in the console.
-(window as unknown as { __godforge: unknown }).__godforge = { game, ctx };
+(window as unknown as { __godforge: unknown }).__godforge = {
+  game,
+  ctx,
+  /** Debug/e2e helper: spawn a unit in the running match. */
+  spawn: (owner: number, def: string, x: number, y: number) => {
+    const scene = game.scene.getScene('World') as unknown as { sim: { world: World } } | null;
+    return scene ? spawnUnit(scene.sim.world, owner, def, x, y).id : -1;
+  },
+};

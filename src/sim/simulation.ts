@@ -4,6 +4,9 @@ import type { Command, ScheduledCommand } from './commands';
 import { movementSystem, pathSystem } from './systems/movement';
 import { orderSystem } from './systems/orders';
 import { productionSystem } from './systems/production';
+import { combatSystem } from './systems/combat';
+import { fogSystem, updateFog } from './systems/fog';
+import { victorySystem } from './systems/victory';
 import { cleanupDead, createWorld, type MatchConfig, type SimEvent, type World } from './world';
 
 /** A system advances one aspect of the world by exactly one tick. Systems run in array order. */
@@ -17,9 +20,12 @@ export interface Controller {
 /** Fixed order of systems. Changing it changes the simulation (and replays). */
 export const DEFAULT_SYSTEMS: System[] = [
   orderSystem,
+  combatSystem,
   productionSystem,
   pathSystem,
   movementSystem,
+  fogSystem,
+  victorySystem,
 ];
 
 /**
@@ -39,6 +45,8 @@ export class Simulation {
   constructor(config: MatchConfig, systems: System[] = DEFAULT_SYSTEMS) {
     this.world = createWorld(config);
     this.systems = systems;
+    updateFog(this.world);
+    this.world.spatial.rebuild(this.world.entities);
   }
 
   /** Queue a command for the next tick (or a later one, e.g. network input delay). */

@@ -84,6 +84,12 @@ export const nb: Partial<Record<TranslationKey, string>> = {
   'err.cooldown': 'Lader fortsatt opp',
   'ev.built': '{name} er ferdig',
   'ev.researched': 'Forsket: {name}',
+  'end.victory': 'Seier!',
+  'end.defeat': 'Tap',
+  'end.stats':
+    'Tid {time}\nEnheter trent {trained} · drept {killed} · tapt {lost}\nBygninger bygd {built} · ressurser sanket {gathered}',
+  'end.again': 'Spill igjen',
+  'end.menu': 'Hovedmeny',
   'cmd.stop': 'Stopp',
   'terrain.0': 'Gress',
   'terrain.1': 'Sand',

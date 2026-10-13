@@ -1,5 +1,6 @@
 import type { Entity } from '../entity';
 import type { World } from '../world';
+import { attackBehavior, attackMoveBehavior, autoAcquire } from './combat';
 import { buildBehavior, gatherBehavior, returnBehavior } from './economy';
 import { isMoving } from './movement';
 
@@ -17,9 +18,17 @@ export function orderSystem(world: World): void {
 
 function runOrder(world: World, e: Entity): void {
   switch (e.order.type) {
+    case 'idle':
+      autoAcquire(world, e);
+      break;
     case 'move':
-    case 'attackMove':
       if (!isMoving(e)) e.order.type = 'idle';
+      break;
+    case 'attackMove':
+      attackMoveBehavior(world, e);
+      break;
+    case 'attack':
+      attackBehavior(world, e);
       break;
     case 'gather':
       gatherBehavior(world, e);
