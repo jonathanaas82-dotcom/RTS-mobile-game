@@ -454,6 +454,15 @@ try {
       f,
     );
     check(ok, `${f} faction starts`);
+    await page.waitForTimeout(2500);
+    const aiBusy = await page.evaluate(() =>
+      window.__godforge.game.scene
+        .getScene('World')
+        .sim.world.entities.some(
+          (e) => e.owner === 1 && e.cls === 'worker' && e.order.type !== 'idle',
+        ),
+    );
+    check(aiBusy, `AI opponent puts its workers to work (${f} game)`);
     await page.screenshot({ path: `${OUT}/06-${f}.png` });
   }
 

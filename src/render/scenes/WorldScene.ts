@@ -7,7 +7,9 @@ import { haptic } from '../../platform/pwa';
 import type { Command } from '../../sim/commands';
 import { FixedStepLoop } from '../../sim/core/loop';
 import type { Entity } from '../../sim/entity';
-import { Simulation } from '../../sim/simulation';
+import type { Simulation } from '../../sim/simulation';
+import { createMatch } from '../../game/match';
+import type { AIController } from '../../ai/AIController';
 import { canAdvance, nextAge } from '../../sim/rules';
 import type { World } from '../../sim/world';
 import { CommandCard, costText, denialText, powerIcon } from '../../ui/commandCard';
@@ -38,6 +40,7 @@ const ME = 0;
 export class WorldScene extends Phaser.Scene {
   ctx!: AppContext;
   sim!: Simulation;
+  ais: AIController[] = [];
   private loop!: FixedStepLoop;
   camModel!: CameraModel;
   private gestures!: GestureRecognizer;
@@ -65,7 +68,9 @@ export class WorldScene extends Phaser.Scene {
 
   create(data: MatchStartData): void {
     this.ctx = this.registry.get(CONTEXT_KEY) as AppContext;
-    this.sim = new Simulation(data);
+    const m = createMatch(data);
+    this.sim = m.sim;
+    this.ais = m.ais;
     this.loop = new FixedStepLoop({
       stepMs: TICK_MS,
       maxStepsPerFrame: SIM.maxStepsPerFrame,
@@ -595,6 +600,7 @@ export class WorldScene extends Phaser.Scene {
         camTileX: this.camModel.centerX / TILE_PX,
         camTileY: this.camModel.centerY / TILE_PX,
         entities: this.world.entities.length,
+        extra: this.ais.map((a) => a.debugText()).join('\n'),
       });
     }
   }
