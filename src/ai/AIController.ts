@@ -87,6 +87,7 @@ export class AIController implements Controller {
     if (this.profile.techs) this.research(p);
     this.production(p);
     this.army(p);
+    this.releaseShelters();
     this.scout();
     this.powers(p);
     if (this.profile.micro) this.heroes();
@@ -259,7 +260,7 @@ export class AIController implements Controller {
     const count = { food: 0, wood: 0, gold: 0 } as Record<'food' | 'wood' | 'gold', number>;
     const idle: Entity[] = [];
     for (const u of workers) {
-      if (u.order.type === 'idle') idle.push(u);
+      if (u.order.type === 'idle' && u.inside < 0) idle.push(u);
       else if (u.order.type === 'gather' || u.order.type === 'return') {
         const k = gatherKind(w, u) ?? u.carryKind;
         if (k && k !== 'favor') count[k]++;
@@ -585,7 +586,7 @@ export class AIController implements Controller {
   // ───────────── army ─────────────
 
   private armyUnits(): Entity[] {
-    return this.mine((e) => e.kind === 'unit' && e.cls !== 'worker');
+    return this.mine((e) => e.kind === 'unit' && e.cls !== 'worker' && e.inside < 0);
   }
 
   private strength(units: Entity[]): number {
@@ -597,7 +598,10 @@ export class AIController implements Controller {
     const army = this.armyUnits();
     if (army.length === 0) {
       const t = this.findThreat();
-      if (t) this.workersDefend(t);
+      if (t) {
+        this.lastThreat = { ...t, tick: w.tick };
+        this.workersDefend(t);
+      }
       return;
     }
     // 1. Defend: visible enemies near our buildings.
@@ -734,11 +738,29 @@ export class AIController implements Controller {
         visibleFor(w, this.me, e),
     );
     const near = this.mine((e) => e.cls === 'worker' && (e.x - t.x) ** 2 + (e.y - t.y) ** 2 < 64);
-    // Only worth it against a small raid.
-    if (raiders.length === 0 || near.length < raiders.length * 2) return;
+    if (raiders.length === 0) return;
+    if (near.length < raiders.length * 2) {
+      // Too many raiders: hide the nearby workers in the Town Hall (adds arrows).
+      const ids = near.filter((u) => u.inside < 0 && u.order.type !== 'garrison').map((u) => u.id);
+      if (ids.length) {
+        this.cmd({ type: 'garrison', player: this.me, ids, target: -1 });
+        this.say(`workers shelter (${ids.length})`);
+      }
+      return;
+    }
     const target = raiders[0]!;
     this.cmd({ type: 'attack', player: this.me, ids: near.map((u) => u.id), target: target.id });
     this.say(`workers defend (${near.length})`);
+  }
+
+  /** Let sheltered workers out once no threat was seen for a while. */
+  private releaseShelters(): void {
+    if (this.lastThreat && this.world.tick - this.lastThreat.tick < TPS * 15) return;
+    for (const b of this.mine((e) => e.kind === 'building')) {
+      if (this.world.entities.some((u) => !u.dead && u.inside === b.id)) {
+        this.cmd({ type: 'ungarrison', player: this.me, building: b.id });
+      }
+    }
   }
 
   private findThreat(): { x: number; y: number } | null {

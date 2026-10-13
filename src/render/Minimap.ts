@@ -122,7 +122,7 @@ export class Minimap {
     c.drawImage(this.base, 0, 0, W, H);
     // Entities: resources, buildings (if explored), units (if visible).
     for (const e of world.entities) {
-      if (e.dead) continue;
+      if (e.dead || e.inside >= 0) continue;
       const i = Math.floor(e.y) * w + Math.floor(e.x);
       const f = fog ? fog[i] : 2;
       if (e.owner !== me) {

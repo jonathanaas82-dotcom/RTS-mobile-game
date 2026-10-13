@@ -174,6 +174,11 @@ export const nb: Partial<Record<TranslationKey, string>> = {
     'Seier! Gå nå videre til klassisk tid: velg rådhuset, trykk på stjernen og velg en gud. Hver gud gir en bonus, en gudekraft og et mytisk vesen.',
   'tut.done':
     'Bra jobbet! Du kan det grunnleggende: sanke, bygge, trene, kjempe og gå videre. Bruk gudekrefter (øverst) med gunst, og ødelegg fiendens rådhus for å vinne.',
+  'cmd.shelter': 'Søk ly',
+  'cmd.shelterHint': 'Søk ly i nærmeste rådhus eller tårn (hver enhet gir en ekstra pil)',
+  'cmd.release': 'Slipp ut',
+  'sel.sheltered': 'I ly {n}/{cap}',
+  'order.garrison': 'Søker ly',
   'cmd.stop': 'Stopp',
   'terrain.0': 'Gress',
   'terrain.1': 'Sand',

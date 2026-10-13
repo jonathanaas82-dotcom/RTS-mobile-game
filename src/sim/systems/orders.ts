@@ -1,6 +1,7 @@
 import type { Entity } from '../entity';
 import type { World } from '../world';
 import { attackBehavior, attackMoveBehavior, autoAcquire } from './combat';
+import { garrisonBehavior } from './garrison';
 import { buildBehavior, gatherBehavior, returnBehavior } from './economy';
 import { isMoving } from './movement';
 
@@ -10,7 +11,7 @@ import { isMoving } from './movement';
  */
 export function orderSystem(world: World): void {
   for (const e of world.entities) {
-    if (e.dead || e.kind !== 'unit') continue;
+    if (e.dead || e.kind !== 'unit' || e.inside >= 0) continue;
     if (e.stunUntil > world.tick) continue;
     runOrder(world, e);
   }
@@ -38,6 +39,9 @@ function runOrder(world: World, e: Entity): void {
       break;
     case 'build':
       buildBehavior(world, e);
+      break;
+    case 'garrison':
+      garrisonBehavior(world, e);
       break;
     default:
       break;

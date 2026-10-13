@@ -25,7 +25,7 @@ export class Selection {
     let changed = false;
     for (const id of this.ids) {
       const e = world.byId.get(id);
-      if (!e || e.dead) {
+      if (!e || e.dead || e.inside >= 0) {
         this.ids.delete(id);
         changed = true;
       }
@@ -79,7 +79,7 @@ export function pickEntity(
   let best: Entity | null = null;
   let bestD = Infinity;
   for (const e of world.entities) {
-    if (e.dead || e.kind !== 'unit' || !visible(e)) continue;
+    if (e.dead || e.kind !== 'unit' || e.inside >= 0 || !visible(e)) continue;
     // Units are drawn standing on their position; also accept taps on the body above the feet.
     const dy = y - (e.y - e.radius * 0.8);
     const d = Math.sqrt((x - e.x) ** 2 + dy * dy) - e.radius;
@@ -120,6 +120,7 @@ export function unitsInRect(
     (e) =>
       !e.dead &&
       e.kind === 'unit' &&
+      e.inside < 0 &&
       e.owner === me &&
       e.x >= minX &&
       e.x <= maxX &&

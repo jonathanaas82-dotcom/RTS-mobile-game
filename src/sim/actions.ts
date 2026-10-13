@@ -5,6 +5,7 @@ import type { World } from './world';
 import { attackDefOf } from './systems/combat';
 import { useAbility } from './systems/abilities';
 import { castPower } from './systems/powers';
+import { garrisonCapacity, nearestShelter, releaseGarrison } from './systems/garrison';
 import { checkWinner, defeat } from './systems/victory';
 
 /** Own, living units from a command's id list (in a stable order). */
@@ -12,7 +13,7 @@ export function ownUnits(world: World, player: number, ids: number[]): Entity[] 
   const out: Entity[] = [];
   for (const id of ids) {
     const e = world.byId.get(id);
-    if (e && !e.dead && e.owner === player && e.kind === 'unit') out.push(e);
+    if (e && !e.dead && e.owner === player && e.kind === 'unit' && e.inside < 0) out.push(e);
   }
   return out;
 }
@@ -85,6 +86,22 @@ export function applyMovementCommand(world: World, c: Command): boolean {
     case 'ability': {
       const h = world.byId.get(c.id);
       if (h && !h.dead && h.owner === c.player && h.cls === 'hero') useAbility(world, h);
+      return true;
+    }
+    case 'garrison': {
+      for (const u of ownUnits(world, c.player, c.ids)) {
+        const b = c.target >= 0 ? world.byId.get(c.target) : nearestShelter(world, u);
+        if (!b || b.dead || b.owner !== c.player || garrisonCapacity(b) === 0) continue;
+        setOrder(u, 'garrison', b.x, b.y, b.id);
+        u.tries = 0;
+        u.repathAt = 0;
+        stopMoving(u);
+      }
+      return true;
+    }
+    case 'ungarrison': {
+      const b = world.byId.get(c.building);
+      if (b && !b.dead && b.owner === c.player) releaseGarrison(world, b);
       return true;
     }
     case 'castPower':

@@ -374,7 +374,12 @@ export class InputController {
   selectIdleWorkers(): Entity[] {
     const world = this.host.world();
     const idle = world.entities.filter(
-      (e) => !e.dead && e.owner === this.host.me && e.cls === 'worker' && e.order.type === 'idle',
+      (e) =>
+        !e.dead &&
+        e.owner === this.host.me &&
+        e.cls === 'worker' &&
+        e.order.type === 'idle' &&
+        e.inside < 0,
     );
     if (idle.length) this.selection.set(idle.map((e) => e.id));
     this.host.refreshHud();
@@ -384,7 +389,12 @@ export class InputController {
   selectArmy(): Entity[] {
     const world = this.host.world();
     const army = world.entities.filter(
-      (e) => !e.dead && e.owner === this.host.me && e.kind === 'unit' && e.cls !== 'worker',
+      (e) =>
+        !e.dead &&
+        e.owner === this.host.me &&
+        e.kind === 'unit' &&
+        e.cls !== 'worker' &&
+        e.inside < 0,
     );
     if (army.length) this.selection.set(army.map((e) => e.id));
     this.host.refreshHud();

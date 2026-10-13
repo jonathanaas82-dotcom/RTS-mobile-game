@@ -62,7 +62,7 @@ export class EntityRenderer {
     const margin = TILE_PX * 3;
     const tick = world.tick;
     for (const e of world.entities) {
-      if (e.dead) continue;
+      if (e.dead || e.inside >= 0) continue;
       const [x, y] = EntityRenderer.pos(e, alpha);
       // Cull off-screen entities entirely (cheap; keeps the scene graph small).
       if (

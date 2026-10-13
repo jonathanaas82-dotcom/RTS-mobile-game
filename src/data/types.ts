@@ -127,6 +127,8 @@ export interface BuildingDef {
   limit?: number;
   sight: number;
   attack?: AttackDef;
+  /** Units that can shelter inside (each adds an arrow to its attack). */
+  garrison?: number;
   /** Counts towards "main buildings" for the win condition. */
   main?: boolean;
   art: BuildingArt;

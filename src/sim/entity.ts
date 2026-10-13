@@ -3,7 +3,8 @@ import type { UnitClass } from '../data/types';
 
 export type EntityKind = 'unit' | 'building' | 'resource';
 
-export type OrderType = 'idle' | 'move' | 'attackMove' | 'attack' | 'gather' | 'build' | 'return';
+export type OrderType =
+  'idle' | 'move' | 'attackMove' | 'attack' | 'gather' | 'build' | 'return' | 'garrison';
 
 /**
  * What a unit is currently doing. `target` is an entity id (-1 = none); `tile` is a map tile
@@ -87,6 +88,8 @@ export interface Entity {
   abilityReadyAt: number;
   /** Summoned units expire at this tick (0 = never). */
   expiresAt: number;
+  /** Building id this unit is sheltering in (-1 = on the map). */
+  inside: number;
   // ── buildings / resources ──
   tileX: number;
   tileY: number;
@@ -146,6 +149,7 @@ export function createEntity(id: number, kind: EntityKind, def: string, owner: n
     buffUntil: 0,
     abilityReadyAt: 0,
     expiresAt: 0,
+    inside: -1,
     tileX: 0,
     tileY: 0,
     size: 0,

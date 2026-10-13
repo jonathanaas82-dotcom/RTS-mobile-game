@@ -28,7 +28,7 @@ export class SpatialHash {
     if (this.next.length < entities.length) this.next = new Int32Array(entities.length * 2);
     for (let i = 0; i < entities.length; i++) {
       const e = entities[i] as Entity;
-      if (e.dead || e.kind !== 'unit') continue;
+      if (e.dead || e.kind !== 'unit' || e.inside >= 0) continue;
       const c = this.cellIndex(e.x, e.y);
       this.next[i] = this.head[c] as number;
       this.head[c] = i;

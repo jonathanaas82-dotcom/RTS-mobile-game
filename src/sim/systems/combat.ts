@@ -6,6 +6,7 @@ import type { AttackDef, UnitClass } from '../../data/types';
 import { gap, idleOrder, type Entity } from '../entity';
 import { killEntity, statOf, type World } from '../world';
 import { isMoving, moveTo, moveToEntity, stopMoving } from './movement';
+import { garrisonCount } from './garrison';
 
 const TPS = SIM.ticksPerSecond;
 
@@ -16,7 +17,7 @@ export function attackDefOf(e: Entity): AttackDef | undefined {
 }
 
 export function isEnemy(a: Entity, b: Entity): boolean {
-  return a.owner >= 0 && b.owner >= 0 && a.owner !== b.owner && !b.dead;
+  return a.owner >= 0 && b.owner >= 0 && a.owner !== b.owner && !b.dead && b.inside < 0;
 }
 
 export function attackRange(world: World, e: Entity, atk: AttackDef): number {
@@ -105,7 +106,9 @@ function splashDamage(
 
 /** Perform one attack (melee hit or projectile launch). */
 function strike(world: World, e: Entity, target: Entity, atk: AttackDef): void {
-  const dmg = statOf(world, e, 'damage', atk.damage);
+  let dmg = statOf(world, e, 'damage', atk.damage);
+  // Sheltered units add arrows to towers and town halls.
+  if (e.kind === 'building') dmg *= 1 + 0.35 * garrisonCount(world, e);
   const cls: UnitClass = e.kind === 'building' ? 'building' : (e.cls as UnitClass);
   e.lastAttack = world.tick;
   e.cooldown = secondsToTicks(atk.cooldown);

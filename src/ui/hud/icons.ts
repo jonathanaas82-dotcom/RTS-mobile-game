@@ -44,6 +44,12 @@ export const ICONS = {
   attackMove: svg(
     '<path d="M4 20L16 8" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M13 4h7v7z"/>',
   ),
+  shelter: svg(
+    '<path d="M3 11l9-7 9 7v10H3z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><path d="M12 20v-6M9 17l3 3 3-3" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round"/>',
+  ),
+  release: svg(
+    '<path d="M3 11l9-7 9 7v10H3z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><path d="M12 20v-6M9 17l3-3 3 3" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round"/>',
+  ),
   menu: svg(
     '<path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>',
   ),

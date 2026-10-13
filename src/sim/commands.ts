@@ -21,6 +21,9 @@ export type Command =
   | { type: 'rally'; player: number; building: number; x: number; y: number }
   | { type: 'castPower'; player: number; power: string; x: number; y: number }
   | { type: 'ability'; player: number; id: number }
+  /** Shelter units in a building (`target` -1 = nearest with room). */
+  | { type: 'garrison'; player: number; ids: number[]; target: number }
+  | { type: 'ungarrison'; player: number; building: number }
   | { type: 'resign'; player: number };
 
 export interface ScheduledCommand {

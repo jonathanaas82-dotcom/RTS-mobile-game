@@ -43,7 +43,7 @@ export function updateFog(world: World): void {
     for (let i = 0; i < fog.length; i++) if (fog[i] === 2) fog[i] = 1;
   }
   for (const e of world.entities) {
-    if (e.dead || e.owner < 0) continue;
+    if (e.dead || e.owner < 0 || e.inside >= 0) continue;
     const fog = world.fog[e.owner];
     if (!fog) continue;
     const base = e.kind === 'unit' ? unitDef(e.def).sight : buildingDef(e.def).sight;

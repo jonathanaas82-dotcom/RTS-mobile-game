@@ -58,7 +58,7 @@ export function pathSystem(world: World): void {
   world.pathsThisTick = 0;
   const grid = world.grid;
   for (const e of world.entities) {
-    if (e.dead || e.kind !== 'unit' || !e.needsPath) continue;
+    if (e.dead || e.kind !== 'unit' || !e.needsPath || e.inside >= 0) continue;
     // Straight line possible? Skip A* entirely (the common case for short moves).
     if (e.goalSize === 0 && walkable(grid, e.x, e.y, e.goalX, e.goalY)) {
       e.path = [e.goalX, e.goalY];
@@ -122,7 +122,7 @@ export function movementSystem(world: World): void {
   const grid = world.grid;
   const tick = world.tick;
   for (const e of world.entities) {
-    if (e.dead || e.kind !== 'unit') continue;
+    if (e.dead || e.kind !== 'unit' || e.inside >= 0) continue;
     if (e.pathIdx * 2 >= e.path.length || e.stunUntil > tick) continue;
     const step = speedPerTick(world, e);
     // Every few ticks, skip a waypoint if the one after it is already in a straight line of walk.
@@ -204,7 +204,7 @@ function separate(world: World): void {
   sh.rebuild(world.entities);
   const grid = world.grid;
   for (const e of world.entities) {
-    if (e.dead || e.kind !== 'unit') continue;
+    if (e.dead || e.kind !== 'unit' || e.inside >= 0) continue;
     const near = sh.query(e.x, e.y, e.radius + 0.75);
     for (let k = 0; k < near.length; k++) {
       const o = near[k] as Entity;

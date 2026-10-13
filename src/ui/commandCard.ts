@@ -21,6 +21,7 @@ import {
   type Check,
 } from '../sim/rules';
 import { statOf, type World } from '../sim/world';
+import { garrisonCapacity, garrisonCount } from '../sim/systems/garrison';
 import { ICONS } from './hud/icons';
 import type { ButtonSpec, SelectionView } from './hud/types';
 
@@ -119,6 +120,12 @@ export class CommandCard {
         detail =
           `${name} ${Math.floor((q.progress / Math.max(1, q.total)) * 100)}%` +
           (e.queue.length > 1 ? ` (+${e.queue.length - 1})` : '');
+      }
+      const cap = garrisonCapacity(e);
+      if (cap > 0 && e.owner === this.host.me) {
+        const inside = garrisonCount(world, e);
+        if (inside > 0)
+          detail = (detail ? `${detail} · ` : '') + t('sel.sheltered', { n: inside, cap });
       }
       return {
         title: loc(d.name, lang),
@@ -233,6 +240,21 @@ export class CommandCard {
           onPress: () => this.host.issue({ type: 'ability', player: me, id: h.id }),
         });
       }
+      if (world.entities.some((b) => !b.dead && b.owner === me && garrisonCapacity(b) > 0)) {
+        out.push({
+          id: 'shelter',
+          svg: ICONS.shelter,
+          label: t('cmd.shelter'),
+          hint: t('cmd.shelterHint'),
+          onPress: () =>
+            this.host.issue({
+              type: 'garrison',
+              player: me,
+              ids: units.map((u) => u.id),
+              target: -1,
+            }),
+        });
+      }
       out.push({
         id: 'stop',
         svg: ICONS.stop,
@@ -245,6 +267,17 @@ export class CommandCard {
     // Buildings: act on the first selected (same-type multi-selection trains in the first).
     const b = own[0]!;
     if (b.kind !== 'building' || !b.built) return out;
+    const sheltered = garrisonCount(world, b);
+    if (sheltered > 0) {
+      out.push({
+        id: 'release',
+        svg: ICONS.release,
+        label: t('cmd.release'),
+        badge: String(sheltered),
+        hint: t('cmd.release'),
+        onPress: () => this.host.issue({ type: 'ungarrison', player: me, building: b.id }),
+      });
+    }
     for (const u of trainOptions(p, b.def)) {
       const chk = canTrain(world, p, b, u.id);
       const cost = costOf(p, world.tick, u.id);

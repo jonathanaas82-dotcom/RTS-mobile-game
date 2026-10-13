@@ -619,7 +619,7 @@ export class WorldScene extends Phaser.Scene {
     let idle = 0;
     let army = 0;
     for (const e of w.entities) {
-      if (e.dead || e.owner !== ME || e.kind !== 'unit') continue;
+      if (e.dead || e.owner !== ME || e.kind !== 'unit' || e.inside >= 0) continue;
       if (e.cls === 'worker') {
         if (e.order.type === 'idle') idle++;
       } else army++;

@@ -254,6 +254,20 @@ export function killEntity(world: World, e: Entity, killer?: Entity): void {
   e.dead = true;
   e.hp = 0;
   if (e.kind !== 'unit') world.grid.unstamp(e);
+  if (e.kind === 'building') {
+    // Sheltered units pour out of a destroyed building.
+    let k = 0;
+    for (const u of world.entities) {
+      if (u.dead || u.inside !== e.id) continue;
+      u.inside = -1;
+      const ti = world.grid.nearestWalkable(e.x + (k % 3) - 1, e.y + Math.floor(k / 3) * 0.5);
+      if (ti >= 0) {
+        u.x = u.px = (ti % world.grid.w) + 0.5;
+        u.y = u.py = Math.floor(ti / world.grid.w) + 0.5;
+      }
+      k++;
+    }
+  }
   world.events.push({
     type: 'death',
     id: e.id,
