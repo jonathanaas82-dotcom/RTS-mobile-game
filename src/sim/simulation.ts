@@ -1,9 +1,19 @@
+import { applyMovementCommand } from './actions';
 import type { Command, ScheduledCommand } from './commands';
-import { generateMap } from './map/mapgen';
-import { createWorld, type MatchConfig, type World } from './world';
+import { movementSystem, pathSystem } from './systems/movement';
+import { orderSystem } from './systems/orders';
+import { cleanupDead, createWorld, type MatchConfig, type SimEvent, type World } from './world';
 
 /** A system advances one aspect of the world by exactly one tick. Systems run in array order. */
 export type System = (world: World) => void;
+
+/** Something that issues commands each tick (AI players, tutorial scripts). */
+export interface Controller {
+  update(world: World, issue: (c: Command) => void): void;
+}
+
+/** Fixed order of systems. Changing it changes the simulation (and replays). */
+export const DEFAULT_SYSTEMS: System[] = [orderSystem, pathSystem, movementSystem];
 
 /**
  * Owns the world and advances it in fixed ticks. Rendering, input and AI talk to the match only
@@ -15,9 +25,12 @@ export class Simulation {
   private pending: ScheduledCommand[] = [];
   /** Commands applied so far, in order — enough to replay the match from its config. */
   readonly history: ScheduledCommand[] = [];
+  readonly controllers: Controller[] = [];
+  /** Events produced since the last drain. */
+  private eventBuffer: SimEvent[] = [];
 
-  constructor(config: MatchConfig, systems: System[] = []) {
-    this.world = createWorld(config, generateMap(config.mapSize, config.seed));
+  constructor(config: MatchConfig, systems: System[] = DEFAULT_SYSTEMS) {
+    this.world = createWorld(config);
     this.systems = systems;
   }
 
@@ -28,6 +41,12 @@ export class Simulation {
 
   step(): void {
     const w = this.world;
+    w.events = [];
+    for (const e of w.entities) {
+      e.px = e.x;
+      e.py = e.y;
+    }
+    for (const c of this.controllers) c.update(w, (cmd) => this.enqueue(cmd));
     if (this.pending.length > 0) {
       const due = this.pending.filter((c) => c.tick <= w.tick);
       this.pending = this.pending.filter((c) => c.tick > w.tick);
@@ -37,13 +56,22 @@ export class Simulation {
       }
     }
     for (const system of this.systems) system(w);
+    cleanupDead(w);
     w.tick++;
+    if (w.events.length) this.eventBuffer.push(...w.events);
+  }
+
+  /** Take all events produced since the last call (render/audio/UI). */
+  drainEvents(): SimEvent[] {
+    const ev = this.eventBuffer;
+    this.eventBuffer = [];
+    return ev;
   }
 }
 
-function applyCommand(_world: World, command: Command): void {
-  switch (command.type) {
-    case 'noop':
-      break;
-  }
+export function applyCommand(world: World, command: Command): void {
+  if (world.winner >= 0) return;
+  const p = world.players[command.player];
+  if (!p || p.defeated) return;
+  if (applyMovementCommand(world, command)) return;
 }

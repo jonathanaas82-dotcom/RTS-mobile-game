@@ -6,6 +6,7 @@ import { registerServiceWorker, suppressBrowserGestures } from './platform/pwa';
 import type { AppContext } from './render/context';
 import { createGame } from './render/game';
 import { hashSeed } from './sim/core/rng';
+import type { MatchConfig } from './sim/world';
 import { Hud } from './ui/hud/Hud';
 import { loadSettings, maxPixelRatio } from './ui/settings';
 
@@ -40,7 +41,15 @@ const ctx: AppContext = {
 };
 hud.attach(ctx);
 
-const game = createGame(document.getElementById('game') as HTMLElement, ctx, { seed, mapSize });
+const match: MatchConfig = {
+  seed,
+  mapSize,
+  players: [
+    { faction: 'hrimfolk', majorGod: 'thunrak', ai: null },
+    { faction: 'aurelian', majorGod: 'aetheon', ai: 'normal' },
+  ],
+};
+const game = createGame(document.getElementById('game') as HTMLElement, ctx, match);
 
 // Auto-pause when the app is backgrounded (phone call, app switch).
 document.addEventListener('visibilitychange', () => {

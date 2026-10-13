@@ -113,40 +113,138 @@ try {
   await page.waitForTimeout(200);
   await page.screenshot({ path: `${OUT}/03-overview.png` });
 
-  // --- Tap shows the info toast.
-  // Software rendering can stall long enough to turn a tap into a long press; retry a few times.
-  let info = '';
-  for (let attempt = 0; attempt < 3 && !/Tile/.test(info); attempt++) {
-    await touch('touchStart', [[422, 195]]);
+  // Helpers that read sim state and convert tile coords to CSS px on screen.
+  const scene = 'window.__godforge.game.scene.getScene("World")';
+  const toScreen = (x, y) =>
+    page.evaluate(
+      ([x, y]) => {
+        const s = window.__godforge.game.scene.getScene('World');
+        const p = s.camModel.worldToScreen(x * 64, y * 64);
+        return [p.x / s.ctx.renderScale, p.y / s.ctx.renderScale];
+      },
+      [x, y],
+    );
+  const tapAt = async (x, y) => {
+    await touch('touchStart', [[x, y]]);
     await touch('touchEnd', []);
-    await page.waitForTimeout(400);
-    info = (await page.locator('.hud-info').textContent()) ?? '';
-  }
-  check(/Tile \d+, \d+/.test(info ?? ''), `tap shows tile info ("${info}")`);
+    await page.waitForTimeout(250);
+  };
+  const selectionSize = () =>
+    page.evaluate(() => window.__godforge.game.scene.getScene('World').input2.selection.ids.size);
 
-  // --- HUD buttons: pause and speed.
+  // Re-centre on our base at default zoom.
+  await page.evaluate(() => {
+    const s = window.__godforge.game.scene.getScene('World');
+    const st = s.sim.world.map.starts[0];
+    s.camModel.zoom = (46 * s.ctx.renderScale) / 64;
+    s.centerOnTile(st.x + 0.5, st.y + 2.5);
+  });
+  await page.waitForTimeout(200);
+
+  // --- Tap a worker to select it.
+  const worker = await page.evaluate(() => {
+    const s = window.__godforge.game.scene.getScene('World');
+    const w = s.sim.world.entities.find((e) => e.owner === 0 && e.cls === 'worker');
+    return { id: w.id, x: w.x, y: w.y };
+  });
+  let [wx, wy] = await toScreen(worker.x, worker.y - 0.2);
+  let selected = false;
+  for (let attempt = 0; attempt < 3 && !selected; attempt++) {
+    await tapAt(wx, wy);
+    selected = (await selectionSize()) === 1;
+  }
+  check(
+    selected && (await page.locator('.hud-selection').isVisible()),
+    'tapping a worker selects it and shows the panel',
+  );
+  await page.screenshot({ path: `${OUT}/02b-selected.png` });
+
+  // --- Tap the ground to move it.
+  const [gx, gy] = await toScreen(worker.x + 4, worker.y - 1);
+  const histLen = () =>
+    page.evaluate(() => window.__godforge.game.scene.getScene('World').sim.history.length);
+  const h0 = await histLen();
+  for (let attempt = 0; attempt < 3 && (await histLen()) === h0; attempt++) await tapAt(gx, gy);
+  await page.waitForTimeout(2500);
+  const moved = await page.evaluate((id) => {
+    const e = window.__godforge.game.scene.getScene('World').sim.world.byId.get(id);
+    return { x: e.x, y: e.y };
+  }, worker.id);
+  check(
+    Math.hypot(moved.x - worker.x, moved.y - worker.y) > 2,
+    `tap on ground moves the selected worker (${moved.x.toFixed(1)},${moved.y.toFixed(1)})`,
+  );
+
+  // --- Idle workers button selects all idle workers.
+  await page.locator('.hud-tools .hud-btn').nth(1).tap();
+  await page.waitForTimeout(200);
+  check(
+    (await selectionSize()) >= 2,
+    `idle-workers button selects workers (${await selectionSize()})`,
+  );
+
+  // --- Long-press + drag draws a selection box.
+  await page.evaluate(() =>
+    window.__godforge.game.scene.getScene('World').input2.selection.clear(),
+  );
+  const ws = await page.evaluate(() =>
+    window.__godforge.game.scene
+      .getScene('World')
+      .sim.world.entities.filter((e) => e.owner === 0 && e.cls === 'worker')
+      .map((e) => [e.x, e.y]),
+  );
+  const pts = await Promise.all(ws.map(([x, y]) => toScreen(x, y)));
+  const minX = Math.min(...pts.map((p) => p[0])) - 30;
+  const minY = Math.min(...pts.map((p) => p[1])) - 30;
+  const maxX = Math.max(...pts.map((p) => p[0])) + 30;
+  const maxY = Math.max(...pts.map((p) => p[1])) + 30;
+  await touch('touchStart', [[minX, minY]]);
+  await page.waitForTimeout(700);
+  for (let i = 1; i <= 6; i++) {
+    await touch('touchMove', [[minX + ((maxX - minX) * i) / 6, minY + ((maxY - minY) * i) / 6]]);
+    await page.waitForTimeout(30);
+  }
+  await page.screenshot({ path: `${OUT}/02c-boxselect.png` });
+  await touch('touchEnd', []);
+  await page.waitForTimeout(200);
+  check(
+    (await selectionSize()) === 3,
+    `long-press drag box-selects all 3 workers (${await selectionSize()})`,
+  );
+  void scene;
+
+  // --- Menu button pauses with a modal.
   await page.locator('.hud-controls .hud-btn').first().tap();
-  await page.waitForTimeout(100);
+  await page.waitForTimeout(150);
   const paused = await page.evaluate(() => window.__godforge.ctx.match.isPaused());
   check(
-    paused && (await page.locator('.hud-pause').isVisible()),
-    'pause button pauses and shows overlay',
+    paused && (await page.locator('.hud-modal').isVisible()),
+    'menu button pauses and shows the menu',
   );
   const pt0 = await tick();
   await page.waitForTimeout(400);
   check((await tick()) === pt0, 'sim does not advance while paused');
-  await page.locator('.pause-card .btn-primary').tap();
+  await page.locator('.modal-actions .btn-primary').tap();
   await page.locator('.hud-controls .hud-btn').nth(1).tap();
   check(
     (await page.evaluate(() => window.__godforge.ctx.match.getSpeed())) === 2,
     'speed button sets 2x',
   );
+  await page.locator('.hud-controls .hud-btn').nth(1).tap();
 
   // --- Touch targets are at least 48 CSS px.
-  const sizes = await page.$$eval('.hud-btn', (els) => els.map((e) => e.getBoundingClientRect()));
+  const sizes = await page.$$eval('.hud-btn', (els) =>
+    els.map((e) => {
+      const r = e.getBoundingClientRect();
+      return { width: r.width, height: r.height, cls: e.className };
+    }),
+  );
   check(
     sizes.every((r) => r.width >= 48 && r.height >= 48),
-    `HUD buttons >= 48px (${sizes.map((r) => r.width).join(',')})`,
+    `HUD buttons >= 48px (${sizes
+      .filter((r) => r.width < 47.5 || r.height < 47.5)
+      .map((r) => r.cls + ':' + r.width + 'x' + r.height)
+      .join(',')})`,
   );
 
   // --- No page scroll / zoom happened.

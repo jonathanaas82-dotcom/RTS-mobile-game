@@ -16,7 +16,10 @@ export type GestureEvent =
   | { type: 'panend'; x: number; y: number; vx: number; vy: number }
   | { type: 'pinchstart'; cx: number; cy: number }
   | { type: 'pinch'; cx: number; cy: number; scale: number; dx: number; dy: number }
-  | { type: 'pinchend' };
+  | { type: 'pinchend' }
+  /** Finger moved after a long press (used for box selection). */
+  | { type: 'pressdrag'; x: number; y: number; startX: number; startY: number }
+  | { type: 'pressend'; x: number; y: number; startX: number; startY: number };
 
 export interface GestureOptions {
   /** Movement (px) a finger may drift and still count as a tap / long press. */
@@ -144,6 +147,9 @@ export class GestureRecognizer {
         this.pinchCy = cy;
         break;
       }
+      case 'longpressed':
+        this.emit({ type: 'pressdrag', x, y, startX: p.startX, startY: p.startY });
+        break;
       default:
         break;
     }
@@ -186,6 +192,10 @@ export class GestureRecognizer {
         }
         break;
       }
+      case 'longpressed':
+        this.emit({ type: 'pressend', x, y, startX: p.startX, startY: p.startY });
+        this.mode = 'idle';
+        break;
       default:
         if (this.ptrs.length === 0) this.mode = 'idle';
         break;

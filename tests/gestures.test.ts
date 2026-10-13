@@ -49,8 +49,9 @@ describe('GestureRecognizer', () => {
     g.update(300);
     expect(types()).toEqual([]);
     g.update(520);
-    g.pointerUp(1, 50, 50, 700);
-    expect(types()).toEqual(['longpress']);
+    g.pointerMove(1, 90, 80, 600);
+    g.pointerUp(1, 90, 80, 700);
+    expect(types()).toEqual(['longpress', 'pressdrag', 'pressend']);
   });
 
   it('pans with deltas and reports fling velocity', () => {
