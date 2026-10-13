@@ -8,7 +8,7 @@ be wrapped with **Capacitor** for Android/iOS.
 All names, factions and art are original. See [PLAN.md](PLAN.md) for milestones and design
 decisions and [ARCHITECTURE.md](ARCHITECTURE.md) for how the code is organised.
 
-> Status: **M8 complete** — full single-player game: menus, tutorial, three factions, four ages, heroes, mythic units, god powers, AI (Easy/Normal/Hard), Norwegian and English. M9 (Capacitor/native) next.
+> Status: **M1–M9 complete** — full single-player game (menus, tutorial, three factions, four ages, heroes, mythic units, god powers, AI Easy/Normal/Hard, Norwegian and English) as an offline PWA, plus configured Android/iOS Capacitor projects. See [STORE_CHECKLIST.md](STORE_CHECKLIST.md) for what's left before store release.
 
 ## Requirements
 
@@ -69,15 +69,19 @@ implemented yet (the deterministic command log makes it possible later; see ARCH
 
 ## Native apps (Capacitor)
 
-`capacitor.config.json` is already present (`webDir: dist`). When ready (M9):
+The Android (`android/`) and iOS (`ios/`, Swift Package Manager) projects are generated and
+configured: landscape only, fullscreen/immersive, notch-aware, native haptics, generated icons and
+splash screens. The web build is copied into them with `cap sync`.
 
-```bash
-npm i @capacitor/core @capacitor/cli @capacitor/android @capacitor/ios
-npm run build
-npx cap add android   # and/or ios
-npx cap sync
-npx cap open android
-```
+| Command                 | What it does                                                   |
+| ----------------------- | -------------------------------------------------------------- |
+| `npm run cap:sync`      | Build the web app and copy it into both native projects        |
+| `npm run cap:android`   | Sync, then open Android Studio (build/run/sign there)          |
+| `npm run cap:ios`       | Sync, then open Xcode (macOS only)                             |
+| `npm run native:assets` | Regenerate launcher icons and splash screens from the SVG icon |
+
+Requirements: Android Studio with SDK 35+ (JDK 21) for Android; Xcode 16+ on macOS for iOS. See
+[STORE_CHECKLIST.md](STORE_CHECKLIST.md) for signing, store listings and the remaining manual steps.
 
 ## Renaming the game
 

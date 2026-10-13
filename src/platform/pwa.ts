@@ -1,7 +1,10 @@
+import { isNative, nativeHaptic } from './native';
+
 /** Browser/PWA integration: service worker, fullscreen, orientation and gesture suppression. */
 
 export function registerServiceWorker(): void {
-  if (!import.meta.env.PROD || !('serviceWorker' in navigator)) return;
+  // Native builds serve files from the app bundle: no service worker needed.
+  if (!import.meta.env.PROD || !('serviceWorker' in navigator) || isNative()) return;
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').catch((err: unknown) => {
       console.warn('Service worker registration failed', err);
@@ -32,7 +35,8 @@ export async function toggleFullscreen(): Promise<void> {
 }
 
 export function fullscreenSupported(): boolean {
-  return typeof document.documentElement.requestFullscreen === 'function';
+  // Native apps are always fullscreen (configured in the native projects).
+  return !isNative() && typeof document.documentElement.requestFullscreen === 'function';
 }
 
 /**
@@ -58,6 +62,10 @@ export function suppressBrowserGestures(): void {
 
 /** Short vibration for important events (no-op where unsupported, e.g. iOS Safari). */
 export function haptic(pattern: number | number[] = 15): void {
+  if (isNative()) {
+    nativeHaptic(pattern);
+    return;
+  }
   try {
     navigator.vibrate?.(pattern);
   } catch {

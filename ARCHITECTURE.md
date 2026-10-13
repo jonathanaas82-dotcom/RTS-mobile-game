@@ -23,8 +23,9 @@ src/
   ui/          DOM HUD, command card, menus, tutorial, gestures, selection, settings, stats
   audio/       Procedural Web Audio sound effects (+ music hook)
   i18n/        t(key) + en/nb dictionaries
-  platform/    PWA, fullscreen/orientation, haptics
+  platform/    PWA, fullscreen/orientation, haptics; native.ts = Capacitor detection + native haptics
 build/         Vite plugins (service-worker precache)
+android/, ios/ Capacitor native shells (generated, then configured: landscape, immersive, icons)
 scripts/       Icon generation, Playwright mobile e2e
 tests/         Vitest unit tests (sim, input, camera, i18n)
 ```
@@ -101,3 +102,11 @@ debug overlay (Settings → Debug info).
 `build/pwa-plugin.ts` emits `sw.js` with a precache of all built files and `public/`. Cache
 name = content hash, so each deploy replaces the cache. Cache-first fetch; navigations fall back
 to the cached shell offline. The SW is only registered in production builds.
+
+## Native (Capacitor)
+
+The same `dist/` build runs in the browser, as an installed PWA and inside the Capacitor shells.
+`src/platform/native.ts` detects the native shell: the service worker and the fullscreen button are
+skipped there (the app is bundled and always fullscreen) and haptics use `@capacitor/haptics`.
+Orientation lock, immersive mode and notch handling are configured in the native projects
+(`AndroidManifest.xml`, `styles.xml`, `MainActivity.java`, `Info.plist`).

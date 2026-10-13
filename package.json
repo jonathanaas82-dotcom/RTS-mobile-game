@@ -13,12 +13,21 @@
     "format": "prettier --write .",
     "e2e": "node scripts/e2e-mobile.mjs",
     "icons": "node scripts/gen-icons.mjs",
-    "balance": "vitest run --config vitest.balance.config.ts --reporter=verbose"
+    "balance": "vitest run --config vitest.balance.config.ts --reporter=verbose",
+    "native:assets": "node scripts/gen-native-assets.mjs",
+    "cap:sync": "npm run build && cap sync",
+    "cap:android": "npm run cap:sync && cap open android",
+    "cap:ios": "npm run cap:sync && cap open ios"
   },
   "dependencies": {
+    "@capacitor/core": "^8.4.3",
+    "@capacitor/haptics": "^8.0.2",
     "phaser": "3.90.0"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.4.3",
+    "@capacitor/cli": "^8.4.3",
+    "@capacitor/ios": "^8.4.3",
     "@eslint/js": "^9.39.5",
     "@types/node": "^22.20.5",
     "eslint": "^9.39.5",

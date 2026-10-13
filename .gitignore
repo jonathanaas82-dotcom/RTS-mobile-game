@@ -3,7 +3,5 @@ dist
 coverage
 *.log
 .DS_Store
-/android
-/ios
 /test-results
 /e2e-output

@@ -3,6 +3,13 @@
   "appName": "Godforge",
   "webDir": "dist",
   "backgroundColor": "#16241a",
-  "android": { "allowMixedContent": false },
-  "ios": { "contentInset": "never" }
+  "android": {
+    "allowMixedContent": false,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false
+  },
+  "ios": {
+    "contentInset": "never",
+    "scrollEnabled": false
+  }
 }

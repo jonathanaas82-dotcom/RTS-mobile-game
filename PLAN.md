@@ -17,7 +17,7 @@ original; real-world mythology is used only as loose public-domain inspiration.
 | M6  | Favor (per-faction income mode), mythic units, god powers, the three factions fully data-driven                                                                                                                                                   | ✅ done |
 | M7  | AI opponent (utility AI + build orders), Easy/Normal/Hard, AI debug overlay                                                                                                                                                                       | ✅ done |
 | M8  | Menus, pre-match, tutorial, settings, i18n (nb/en) completion, audio, polish, performance + balance pass                                                                                                                                          | ✅ done |
-| M9  | Capacitor (Android/iOS) config, store-readiness checklist                                                                                                                                                                                         |         |
+| M9  | Capacitor (Android/iOS) config, store-readiness checklist                                                                                                                                                                                         | ✅ done |
 
 Every milestone ends with: `npm run lint && npm test && npm run build && npm run e2e` (Playwright, phone
 viewport with touch emulation, screenshot in `e2e-output/`), then a git commit.

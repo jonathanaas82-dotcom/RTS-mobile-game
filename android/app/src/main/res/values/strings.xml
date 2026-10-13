@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Godforge</string>
+    <string name="title_activity_main">Godforge</string>
+    <string name="package_name">com.godforge.game</string>
+    <string name="custom_url_scheme">com.godforge.game</string>
+</resources>
