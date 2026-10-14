@@ -6,7 +6,7 @@ import type { MatchArt } from '../assets/matchArt';
 import { TILE_PX } from '../assets/tileset';
 import { ART_RES } from '../assets/procedural/draw';
 import { PALETTE } from '../assets/palette';
-import type { WorkAct } from '../assets/procedural/units';
+import { rodTip, type WorkAct } from '../assets/procedural/units';
 
 const TEAM = PALETTE.players.map((c) => parseInt(c.slice(1), 16));
 /** Buildings that send up hearth smoke. */
@@ -40,6 +40,8 @@ export class EntityRenderer {
   private readonly pool: Phaser.GameObjects.Image[] = [];
   private readonly rings: Phaser.GameObjects.Graphics;
   private readonly bars: Phaser.GameObjects.Graphics;
+  /** Fishing lines (rod tip to bobber). */
+  private readonly lines: Phaser.GameObjects.Graphics;
   private frameNo = 0;
   /** Called when a worker's tool lands (wood chips, sparks, splashes...). */
   onWorkImpact: ((act: WorkAct, x: number, y: number, facing: number) => void) | null = null;
@@ -53,6 +55,7 @@ export class EntityRenderer {
     this.art = art;
     this.rings = scene.add.graphics().setDepth(-0.5);
     this.bars = scene.add.graphics().setDepth(1e6);
+    this.lines = scene.add.graphics().setDepth(9e4);
   }
 
   /** World-pixel position of an entity at interpolation `alpha`. */
@@ -74,6 +77,7 @@ export class EntityRenderer {
     const bars = this.bars;
     rings.clear();
     bars.clear();
+    this.lines.clear();
     const margin = TILE_PX * 3;
     const tick = world.tick;
     for (const e of world.entities) {
@@ -111,6 +115,7 @@ export class EntityRenderer {
           !working && sinceAttack >= 0 && sinceAttack < 3 ? e.facing * (3 - sinceAttack) * 3 : 0;
         s.setPosition(x + lunge, y + bob);
         s.setFlipX(e.facing < 0);
+        if (anim?.act === 'fish') this.fishingLine(world, e, s, anim.frame as 0 | 1, time);
         // Walking sway and a forward lean while striking.
         s.setAngle((moving ? step * 3 : 0) + (lunge !== 0 ? e.facing * 6 : 0));
         s.setDepth(y);
@@ -290,6 +295,53 @@ export class EntityRenderer {
     }
     if (moving && step > 0) return pick('walk');
     return null;
+  }
+
+  /**
+   * Line from the rod tip (in the sprite's design box) to a bobber on the fishing spot, sagging
+   * a little; the bobber dips on the strike frame and leaves a ripple.
+   */
+  private fishingLine(
+    world: World,
+    e: Entity,
+    s: Phaser.GameObjects.Image,
+    frame: 0 | 1,
+    time: number,
+  ): void {
+    const spot = world.byId.get(e.order.target);
+    if (!spot) return;
+    const [dx, dy] = rodTip(frame);
+    const flip = e.facing < 0 ? -1 : 1;
+    const tx = s.x + (dx / 100 - 0.5) * s.displayWidth * flip;
+    const ty = s.y + (dy / 100 - 0.86) * s.displayHeight;
+    // Each fisher gets their own spot on the shoal, a little towards themselves.
+    const cx = spot.x * TILE_PX;
+    const cy = spot.y * TILE_PX;
+    const ang = Math.atan2(s.y - cy, s.x - cx) + ((e.id % 5) - 2) * 0.35;
+    const bx = cx + Math.cos(ang) * TILE_PX * 0.22;
+    const by = cy + Math.sin(ang) * TILE_PX * 0.16 + (frame === 1 ? 2 : Math.sin(time * 0.005) * 1);
+    const g = this.lines;
+    const mx = (tx + bx) / 2;
+    const my = Math.max(ty, by) + 10;
+    g.lineStyle(1.2, 0xf4f1e6, 0.85);
+    g.beginPath();
+    g.moveTo(tx, ty);
+    const steps = 10;
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+      const x = (1 - t) * (1 - t) * tx + 2 * (1 - t) * t * mx + t * t * bx;
+      const y = (1 - t) * (1 - t) * ty + 2 * (1 - t) * t * my + t * t * by;
+      g.lineTo(x, y);
+    }
+    g.strokePath();
+    // Ripple ring and the red-and-white float.
+    const k = (((time * 0.0012 + e.id * 0.37) % 1) + 1) % 1;
+    g.lineStyle(1, 0xffffff, 0.55 * (1 - k));
+    g.strokeEllipse(bx, by + 1, 6 + k * 12, 2.5 + k * 5);
+    g.fillStyle(0xe8442e, 1);
+    g.fillCircle(bx, by - 1, 2.6);
+    g.fillStyle(0xffffff, 1);
+    g.fillCircle(bx, by - 2.6, 1.3);
   }
 
   /** A fish arcs out of the water and splashes back in. */

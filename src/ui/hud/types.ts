@@ -33,6 +33,8 @@ export interface SelectionView {
   /** Counter hints. */
   strong?: string;
   weak?: string;
+  /** Special traits (badges; tapping one shows its description). */
+  traits?: Array<{ name: string; desc: string; glyph: string }>;
   /** Multi-selection: icon + count per type. */
   groups?: Array<{ key: string; icon: string; count: number; onPress: () => void }>;
   onDeselect: () => void;

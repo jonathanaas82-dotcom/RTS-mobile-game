@@ -169,7 +169,7 @@ export class Hud implements HudPort {
       return;
     }
     this.selEl.hidden = false;
-    const key = `${v.title}|${v.icon}|${v.groups?.map((g) => g.key + g.count).join(',')}`;
+    const key = `${v.title}|${v.icon}|${v.traits?.length ?? 0}|${v.groups?.map((g) => g.key + g.count).join(',')}`;
     if (key !== this.selKey) {
       this.selKey = key;
       this.selEl.innerHTML = '';
@@ -199,6 +199,15 @@ export class Hud implements HudPort {
         el('div', 'sel-hp', txt).append(el('div', 'sel-hp-fill'));
         el('div', 'sel-detail', txt);
         el('div', 'sel-counters', txt);
+        if (v.traits?.length) {
+          const row = el('div', 'sel-traits', txt);
+          for (const tr of v.traits) {
+            const b = el('button', 'trait-chip', row);
+            b.type = 'button';
+            b.innerHTML = `<svg viewBox="0 0 24 24"><path d="${tr.glyph}"/></svg><span>${escapeHtml(tr.name)}</span>`;
+            onPress(b, () => this.flashInfo(`${tr.name}: ${tr.desc}`, 3500));
+          }
+        }
       }
     }
     const q = (c: string): HTMLElement | null => this.selEl.querySelector(c);

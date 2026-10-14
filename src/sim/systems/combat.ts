@@ -1,4 +1,5 @@
-import { buildingDef, unitDef } from '../../data';
+import { buildingDef, hasTrait, unitDef } from '../../data';
+import { TRAIT } from '../../data/traits';
 import { counterMultiplier } from '../../data/counters';
 import { RULES } from '../../data/balance/rules';
 import { SIM, secondsToTicks } from '../../data/balance/sim';
@@ -35,14 +36,23 @@ export function applyDamage(
   base: number,
   /** God powers ignore the counter matrix (but not armor). */
   raw = false,
+  /** Delivered by a projectile (arrows, stones, beams). */
+  ranged = false,
 ): number {
   if (target.dead || target.kind === 'resource') return 0;
   const tCls: UnitClass = target.kind === 'building' ? 'building' : (target.cls as UnitClass);
   let dmg = raw ? base : base * counterMultiplier(src.cls, tCls);
-  if (src.entity && src.entity.buffUntil > world.tick) dmg *= 1.25;
+  const a = src.entity;
+  if (a && a.buffUntil > world.tick) dmg *= 1.25;
+  let armorMul = 1;
+  if (!raw && a && a.kind === 'unit') dmg *= attackerTraits(world, a, tCls, (m) => (armorMul = m));
+  if (!raw && target.kind === 'unit') dmg *= defenderTraits(target, src.cls, ranged);
   const baseArmor =
     target.kind === 'unit' ? unitDef(target.def).armor : buildingDef(target.def).armor;
-  const armor = Math.min(0.85, Math.max(0, statOf(world, target, 'armor', baseArmor)));
+  let armor = statOf(world, target, 'armor', baseArmor);
+  if (target.kind === 'unit' && hasTrait(target.def, 'phalanx'))
+    armor += phalanxBonus(world, target);
+  armor = Math.min(0.85, Math.max(0, armor * armorMul));
   dmg = Math.max(1, dmg * (1 - armor));
   target.hp -= dmg;
   target.lastHit = world.tick;
@@ -86,6 +96,62 @@ export function applyDamage(
   return dmg;
 }
 
+/** Damage multiplier from the attacker's traits; `setArmorMul` lowers the target's armour. */
+function attackerTraits(
+  world: World,
+  a: Entity,
+  tCls: UnitClass,
+  setArmorMul: (m: number) => void,
+): number {
+  const traits = unitDef(a.def).traits;
+  let m = 1;
+  if (traits) {
+    for (const t of traits) {
+      if (t === 'brace' && tCls === 'cavalry') m *= TRAIT.braceDamage;
+      else if (t === 'frenzy') m *= 1 + TRAIT.frenzyMax * (1 - Math.max(0, a.hp) / a.maxHp);
+      else if (t === 'demolisher' && tCls === 'building') m *= TRAIT.demolisher;
+      else if (t === 'harrier' && TRAIT.harrierVs.includes(tCls)) m *= TRAIT.harrier;
+      else if (t === 'piercing') setArmorMul(1 - TRAIT.piercing);
+    }
+  }
+  if (a.cls !== 'worker' && inspired(world, a)) m *= TRAIT.inspireDamage;
+  return m;
+}
+
+/** Damage multiplier from the defender's traits. */
+function defenderTraits(target: Entity, attackerCls: UnitClass, ranged: boolean): number {
+  const traits = unitDef(target.def).traits;
+  if (!traits) return 1;
+  let m = 1;
+  for (const t of traits) {
+    if (t === 'shieldwall' && ranged) m *= TRAIT.shieldwallTaken;
+    else if (t === 'brace' && attackerCls === 'cavalry') m *= TRAIT.braceTaken;
+  }
+  return m;
+}
+
+/** Is an allied unit with Inspire (other than `a` itself) close enough to `a`? */
+function inspired(world: World, a: Entity): boolean {
+  const r = TRAIT.inspireRadius;
+  for (const o of world.spatial.query(a.x, a.y, r)) {
+    if (o === a || o.dead || o.owner !== a.owner || o.kind !== 'unit' || o.inside >= 0) continue;
+    if (!hasTrait(o.def, 'inspire')) continue;
+    if ((o.x - a.x) ** 2 + (o.y - a.y) ** 2 <= r * r) return true;
+  }
+  return false;
+}
+
+/** Extra armour from friendly infantry standing close to a phalanx unit. */
+function phalanxBonus(world: World, e: Entity): number {
+  const r = TRAIT.phalanxRadius;
+  let n = 0;
+  for (const o of world.spatial.query(e.x, e.y, r)) {
+    if (o === e || o.dead || o.owner !== e.owner || o.cls !== 'infantry' || o.inside >= 0) continue;
+    if ((o.x - e.x) ** 2 + (o.y - e.y) ** 2 <= r * r) n++;
+  }
+  return Math.min(TRAIT.phalanxMax, n * TRAIT.phalanxArmor);
+}
+
 function splashDamage(
   world: World,
   src: { owner: number; cls: UnitClass; entity: Entity | null },
@@ -94,13 +160,14 @@ function splashDamage(
   radius: number,
   base: number,
   primary: number,
+  ranged = false,
 ): void {
   for (const o of world.spatial.query(x, y, radius + 0.6)) {
     if (o.id === primary || o.dead || o.owner === src.owner || o.owner < 0) continue;
     const d = Math.sqrt((o.x - x) ** 2 + (o.y - y) ** 2) - o.radius;
     if (d > radius) continue;
     const falloff = 1 - 0.5 * Math.max(0, d / radius);
-    applyDamage(world, src, o, base * falloff);
+    applyDamage(world, src, o, base * falloff, false, ranged);
   }
 }
 
@@ -110,6 +177,15 @@ function strike(world: World, e: Entity, target: Entity, atk: AttackDef): void {
   // Sheltered units add arrows to towers and town halls.
   if (e.kind === 'building') dmg *= 1 + 0.2 * garrisonCount(world, e);
   const cls: UnitClass = e.kind === 'building' ? 'building' : (e.cls as UnitClass);
+  // Charge: the first blow after a pause out of combat lands twice as hard.
+  if (
+    e.kind === 'unit' &&
+    hasTrait(e.def, 'charge') &&
+    world.tick - e.lastAttack > TRAIT.chargeIdle * TPS
+  ) {
+    dmg *= TRAIT.chargeDamage;
+    world.events.push({ type: 'charge', id: e.id, x: e.x, y: e.y });
+  }
   e.lastAttack = world.tick;
   e.cooldown = secondsToTicks(atk.cooldown);
   world.events.push({ type: 'attack', id: e.id, target: target.id, ranged: !!atk.projectileSpeed });
@@ -135,6 +211,16 @@ function strike(world: World, e: Entity, target: Entity, atk: AttackDef): void {
   const src = { owner: e.owner, cls, entity: e };
   applyDamage(world, src, target, dmg);
   if (atk.splash) splashDamage(world, src, target.x, target.y, atk.splash, dmg, target.id);
+  else if (e.kind === 'unit' && hasTrait(e.def, 'cleave'))
+    splashDamage(
+      world,
+      src,
+      target.x,
+      target.y,
+      TRAIT.cleaveRadius,
+      dmg * TRAIT.cleaveShare,
+      target.id,
+    );
 }
 
 /** Order 'attack' (and engaging during attack-move). Returns false when the target is gone. */
@@ -270,8 +356,10 @@ export function combatSystem(world: World): void {
         killEntity(world, e);
         continue;
       }
-      if (e.cls === 'hero' && tick - e.lastHit > RULES.regenDelay * TPS && e.hp < e.maxHp) {
-        e.hp = Math.min(e.maxHp, e.hp + RULES.heroRegen / TPS);
+      if (tick - e.lastHit > RULES.regenDelay * TPS && e.hp < e.maxHp) {
+        if (e.cls === 'hero') e.hp = Math.min(e.maxHp, e.hp + RULES.heroRegen / TPS);
+        else if (hasTrait(e.def, 'regenerate'))
+          e.hp = Math.min(e.maxHp, e.hp + TRAIT.regenerate / TPS);
       }
     } else if (e.kind === 'building' && e.built && e.owner >= 0) {
       const atk = buildingDef(e.def).attack;
@@ -298,8 +386,9 @@ export function combatSystem(world: World): void {
       pr.y = pr.ty;
       pr.dead = true;
       const src = { owner: pr.owner, cls: pr.sourceCls, entity: world.byId.get(pr.source) ?? null };
-      if (t && !t.dead) applyDamage(world, src, t, pr.damage);
-      if (pr.splash > 0) splashDamage(world, src, pr.tx, pr.ty, pr.splash, pr.damage, pr.target);
+      if (t && !t.dead) applyDamage(world, src, t, pr.damage, false, true);
+      if (pr.splash > 0)
+        splashDamage(world, src, pr.tx, pr.ty, pr.splash, pr.damage, pr.target, true);
     } else {
       pr.x += (dx / d) * pr.speed;
       pr.y += (dy / d) * pr.speed;

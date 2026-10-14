@@ -497,6 +497,12 @@ export class WorldScene extends Phaser.Scene {
         if (ev.kind !== 'resource' && onScreen(ev.x, ev.y))
           at('death', ev.x, ev.y, ev.kind === 'building' ? 1 : 0.7);
         break;
+      case 'charge':
+        if (onScreen(ev.x, ev.y)) {
+          at('charge', ev.x, ev.y, 0.9);
+          this.fx.dustAt(ev.x * TILE_PX, ev.y * TILE_PX, 10);
+        }
+        break;
       case 'treeCut': {
         const w = this.world.map.width;
         const tx = (ev.tile % w) + 0.5;

@@ -2,8 +2,9 @@ import { buildingDef, loc, powerDef, techDef, unitDef } from '../data';
 import { AGES } from '../data/factions';
 import { strongAgainst, weakAgainst } from '../data/counters';
 import type { ResourceKind } from '../data/balance/economy';
-import type { Cost, PowerKind, UnitClass } from '../data/types';
-import { getLanguage, t, type TranslationKey } from '../i18n';
+import type { Cost, PowerKind, TraitId, UnitClass } from '../data/types';
+import { TRAITS } from '../data/traits';
+import { getLanguage, t, type Language, type TranslationKey } from '../i18n';
 import type { Command } from '../sim/commands';
 import type { Entity } from '../sim/entity';
 import { costOf } from '../sim/player';
@@ -39,6 +40,11 @@ export interface CardHost {
 }
 
 const RES_ORDER: ResourceKind[] = ['food', 'wood', 'gold', 'favor'];
+
+/** ", Braced Spears, Charge" style list of a unit's trait names (empty when none). */
+function traitList(traits: TraitId[] | undefined, lang: Language): string {
+  return traits?.length ? `: ${traits.map((tr) => loc(TRAITS[tr].name, lang)).join(', ')}` : '';
+}
 
 export function costText(cost: Cost): string {
   const parts: string[] = [];
@@ -168,6 +174,11 @@ export class CommandCard {
       detail,
       strong,
       weak,
+      traits: (u.traits ?? []).map((tr) => ({
+        name: loc(TRAITS[tr].name, lang),
+        desc: loc(TRAITS[tr].desc, lang),
+        glyph: TRAITS[tr].glyph,
+      })),
       onDeselect,
     };
   }
@@ -295,7 +306,7 @@ export class CommandCard {
             ? head.progress / Math.max(1, head.total)
             : 0,
         disabled: !chk.ok,
-        hint: `${loc(u.name, lang)} (${className(u.cls)}) — ${costText(cost)}${chk.ok ? '' : ` · ${denialText(chk)}`}. ${t('hint.cancelHold')}`,
+        hint: `${loc(u.name, lang)} (${className(u.cls)}${traitList(u.traits, lang)}) — ${costText(cost)}${chk.ok ? '' : ` · ${denialText(chk)}`}. ${t('hint.cancelHold')}`,
         onPress: () => this.host.issue({ type: 'train', player: me, building: b.id, unit: u.id }),
         onLongPress: () => {
           const idx = b.queue.map((q) => q.id).lastIndexOf(u.id);
@@ -379,7 +390,7 @@ export function frameOf(e: Entity): string {
 }
 
 const powerIcons = new Map<string, string>();
-const GLYPH: Record<PowerKind, string> = {
+export const GLYPH: Record<PowerKind, string> = {
   strike: 'M13 2L4 14h7l-2 8 9-12h-7z',
   dot: 'M12 3c3 4 6 7 6 11a6 6 0 0 1-12 0c0-3 2-5 3-7 1 2 2 3 3 3 0-3-1-5 0-7z',
   heal: 'M10 4h4v6h6v4h-6v6h-4v-6H4v-4h6z',

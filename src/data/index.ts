@@ -12,6 +12,7 @@ import type {
   LocText,
   PowerDef,
   TechDef,
+  TraitId,
   UnitDef,
 } from './types';
 import { UNITS } from './units';
@@ -45,6 +46,11 @@ export const godDef = (id: string): GodDef => get(gods, id, 'god');
 export const powerDef = (id: string): PowerDef => get(powers, id, 'power');
 export const factionDef = (id: FactionId | string): FactionDef => get(factions, id, 'faction');
 export const isUnit = (id: string): boolean => units.has(id);
+
+/** Does this unit type have the trait? (Units only; unknown ids have none.) */
+export function hasTrait(def: string, trait: TraitId): boolean {
+  return units.get(def)?.traits?.includes(trait) ?? false;
+}
 export const isBuilding = (id: string): boolean => buildings.has(id);
 
 /** Units this faction can train at a building (excluding god-locked ones the caller must filter). */

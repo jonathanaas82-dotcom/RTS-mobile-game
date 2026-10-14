@@ -1,4 +1,4 @@
-import { buildingDef, factionDef, powerDef, techDef, unitDef } from '../data';
+import { buildingDef, factionDef, hasTrait, powerDef, techDef, unitDef } from '../data';
 import { AI_ARMY_MIX, AI_GATHER_SPLIT, AI_PROFILES, type AIProfile } from '../data/ai';
 import { counterMultiplier } from '../data/counters';
 import type { ResourceKind } from '../data/balance/economy';
@@ -578,6 +578,9 @@ export class AIController implements Controller {
         }
         wgt *= Math.max(0.15, 1 + edge * 1.5);
       }
+      // Several options of the same class share that class's weight.
+      wgt /= ids.filter((o) => unitDef(o).cls === cls).length;
+      wgt *= this.traitWeight(p, id, totalSeen);
       return wgt;
     });
     const sum = weights.reduce((a, b) => a + b, 0);
@@ -588,6 +591,29 @@ export class AIController implements Controller {
       if (r <= 0) return ids[i]!;
     }
     return ids[ids.length - 1]!;
+  }
+
+  /** Bias for unit traits: anti-cavalry when cavalry is seen, a few supports, etc. */
+  private traitWeight(p: PlayerState, id: string, totalSeen: number): number {
+    const traits = unitDef(id).traits;
+    if (!traits) return 1;
+    const share = (c: UnitClass): number =>
+      totalSeen > 0 ? (this.enemyMix[c] ?? 0) / totalSeen : 0;
+    let m = 1;
+    for (const t of traits) {
+      if (t === 'brace') m *= 0.35 + 3 * share('cavalry');
+      else if (t === 'scout') {
+        const scouts = this.armyUnits().filter((u) => hasTrait(u.def, 'scout')).length;
+        m *= scouts >= 2 ? 0.04 : 0.6;
+      } else if (t === 'harrier') m *= 0.8 + 2 * (share('ranged') + share('siege'));
+      else if (t === 'demolisher') m *= p.age >= 2 ? 1.3 : 0.7;
+      else if (t === 'inspire') {
+        const army = this.armyUnits();
+        const have = army.filter((u) => hasTrait(u.def, 'inspire')).length;
+        m *= army.length < 6 || have >= 1 + Math.floor(army.length / 12) ? 0.03 : 0.5;
+      }
+    }
+    return m;
   }
 
   // ───────────── army ─────────────

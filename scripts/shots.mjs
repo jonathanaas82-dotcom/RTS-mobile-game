@@ -153,6 +153,14 @@ if (run('4')) {
       if (e.order.tile >= 0) return 'chop';
       return w.byId.get(e.order.target)?.def ?? null;
     };
+    if (want === 'fish' && !w.entities.some((e) => busy(e) === 'fish')) {
+      // Staging: send two of our workers to the nearest fishing spot.
+      const hall = w.entities.find((e) => e.owner === 0 && e.def === 'town_hall');
+      const d2 = (e) => (e.x - hall.x) ** 2 + (e.y - hall.y) ** 2;
+      const spot = w.entities.filter((e) => e.def === 'fish').sort((a, b) => d2(a) - d2(b))[0];
+      const ws = w.entities.filter((e) => e.owner === 0 && e.cls === 'worker').slice(0, 2);
+      if (spot) s.issue({ type: 'gather', player: 0, ids: ws.map((e) => e.id), target: spot.id, tile: -1 });
+    }
     for (let k = 0; k < 60; k++) {
       const hits = w.entities.filter((e) => busy(e) === want);
       if (hits.length) {
@@ -183,6 +191,26 @@ if (run('2')) {
     s.camModel.zoom = (38 * s.ctx.renderScale) / 64;
     s.centerOnTile(st.x + 2, st.y + 3);
     return `tick ${s.sim.world.tick}`;
+  });
+}
+
+// A soldier selected up close: detailed art and trait badges in the HUD.
+if (run('2')) {
+  await shot('2-unit-traits', () => {
+    const s = window.__godforge.game.scene.getScene('World');
+    const w = s.sim.world;
+    const mine = (id) =>
+      w.entities.find((e) => e.owner === 0 && e.kind === 'unit' && !e.dead && e.inside < 0 && e.def === id);
+    let pick = null;
+    for (let k = 0; k < 40 && !pick; k++) {
+      pick = mine('marble_champion') ?? mine('bronzeguard') ?? mine('signbearer') ?? mine('lancer');
+      if (!pick) s.fastForward(20 * 10);
+    }
+    if (!pick) return 'none';
+    s.camModel.zoom = (80 * s.ctx.renderScale) / 64;
+    s.centerOnTile(pick.x, pick.y);
+    s.input2.selection.set([pick.id]);
+    return pick.def;
   });
 }
 

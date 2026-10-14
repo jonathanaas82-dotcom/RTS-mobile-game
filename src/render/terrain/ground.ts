@@ -154,7 +154,7 @@ export function paintGround(map: GameMap): GroundChunk[] {
   const seed = map.seed | 0;
   const edge = new NoiseGrid(w, h, 3, seed ^ 0x1234, [
     [1.4, 1],
-    [0.45, 0.5],
+    [0.6, 0.35],
   ]);
   const color = new NoiseGrid(w, h, 1, seed ^ 0x9876, [
     [7, 1],
@@ -233,22 +233,24 @@ export function paintGround(map: GameMap): GroundChunk[] {
             }
             mixInto(r, t);
           }
-          // Water with depth gradient and a foam line at the shore.
-          if (wv > 0.5) {
+          // Water with depth gradient and a foam line at the shore. The shoreline is blended
+          // over a few pixels (coverage, not a hard threshold) so it never stair-steps.
+          if (wv > 0.45) {
             const depth = smooth(0.5, 1.05, wv);
-            out.r = C.shallow[0] + (C.deep[0] - C.shallow[0]) * depth;
-            out.g = C.shallow[1] + (C.deep[1] - C.shallow[1]) * depth;
-            out.b = C.shallow[2] + (C.deep[2] - C.shallow[2]) * depth;
-            // Soft ripples.
             const rip = Math.sin((u * 2.1 + v * 1.3 + col * 6) * 3.1) * 0.5 + 0.5;
             const rk = 1 + (rip - 0.5) * 0.08 * (1 - depth);
-            out.r *= rk;
-            out.g *= rk;
-            out.b *= rk;
-            if (wv < 0.56) mixInto(C.foam, (1 - (wv - 0.5) / 0.06) * 0.75);
+            const water: RGB = [
+              (C.shallow[0] + (C.deep[0] - C.shallow[0]) * depth) * rk,
+              (C.shallow[1] + (C.deep[1] - C.shallow[1]) * depth) * rk,
+              (C.shallow[2] + (C.deep[2] - C.shallow[2]) * depth) * rk,
+            ];
+            mixInto(water, smooth(0.465, 0.535, wv));
+            // Foam: a soft band just inside the waterline.
+            const foam = smooth(0.475, 0.505, wv) * (1 - smooth(0.515, 0.565, wv));
+            if (foam > 0) mixInto(C.foam, foam * 0.6);
           }
           // Grain and darkening towards the map border.
-          const g = gh * (wv > 0.5 ? 3 : cn > 0.45 ? 12 : 6);
+          const g = gh * (wv > 0.52 ? 3 : cn > 0.45 ? 12 : 6);
           const border = Math.min(u, v, w - u, h - v);
           const vig = border < 2 ? 0.75 + 0.125 * border : 1;
           const o = (py * canvas.width + pxx) * 4;

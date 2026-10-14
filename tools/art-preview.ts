@@ -24,6 +24,9 @@ const add = (cv: HTMLCanvasElement, label: string, scale = 0.5): void => {
 const teams = ['#3b82f6', '#e5484d'];
 if (sheet === 'units') {
   for (const u of UNITS) add(drawUnit(u, teams[UNITS.indexOf(u) % 2]!), u.id, 0.75);
+} else if (sheet === 'humans') {
+  for (const u of UNITS.filter((d) => d.art.shape === 'humanoid' || d.art.shape === 'rider'))
+    add(drawUnit(u, teams[0]!), u.id, 1.25);
 } else if (sheet === 'poses') {
   for (const u of UNITS.filter((d) => d.cls === 'worker')) {
     const poses: Pose[] = [{}, { stride: true }];

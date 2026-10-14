@@ -566,7 +566,7 @@ try {
   await page.waitForSelector('.menu-main', { timeout: 5000 });
   check(true, 'quit returns to the main menu');
   // Settings: switch to Norwegian.
-  await page.locator('.menu-main .menu-btn').nth(2).tap();
+  await page.locator('.menu-main .menu-btn', { hasText: 'Settings' }).tap();
   await page.waitForSelector('.menu-settings');
   await page.locator('.set-row').first().locator('.seg-btn').nth(1).tap();
   await page.waitForTimeout(200);
@@ -577,8 +577,25 @@ try {
   await page.waitForTimeout(150);
   await page.locator('.menu-back').tap();
   await page.waitForSelector('.menu-main');
+  // Codex: gods and unit sheets render.
+  await page.locator('.menu-main .menu-btn', { hasText: 'Codex' }).tap();
+  await page.waitForSelector('.codex-gods');
+  const godTiles = await page.locator('.codex-god').count();
+  await page.locator('.codex-tabs .seg-btn').nth(1).tap();
+  await page.waitForSelector('.codex-detail');
+  const unitCards = await page.locator('.codex-unit').count();
+  check(
+    godTiles >= 12 && unitCards >= 10,
+    `codex shows gods (${godTiles}) and units (${unitCards})`,
+  );
+  await page.screenshot({ path: `${OUT}/11-codex.png` });
+  await page.locator('.menu-back').tap();
+  await page.waitForSelector('.menu-main');
   // Tutorial.
-  await page.locator('.menu-main .menu-btn').nth(1).tap();
+  await page
+    .locator('.menu-main .menu-btn', { hasText: /Tutorial|Opplæring|Veiledning/ })
+    .first()
+    .tap();
   await page.waitForSelector('.coach', { timeout: 20000 });
   check(await page.locator('.coach').isVisible(), 'tutorial coach shown');
   await page.locator('.coach .btn-primary').tap();

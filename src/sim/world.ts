@@ -76,6 +76,7 @@ export type SimEvent =
   | { type: 'ability'; id: number; owner: number; kind: string; x: number; y: number }
   | { type: 'underAttack'; owner: number; x: number; y: number }
   | { type: 'treeCut'; tile: number }
+  | { type: 'charge'; id: number; x: number; y: number }
   | { type: 'gathered'; id: number; owner: number }
   | { type: 'gameOver'; winner: number }
   | { type: 'error'; owner: number; code: 'cost' | 'pop' | 'place' | 'limit' | 'age' | 'cooldown' };

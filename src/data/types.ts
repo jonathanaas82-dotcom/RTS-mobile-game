@@ -36,13 +36,49 @@ export interface AttackDef {
 /** Procedural placeholder art description (see src/render/assets/procedural/units.ts). */
 export interface UnitArt {
   shape: 'humanoid' | 'rider' | 'engine' | 'giant' | 'serpent' | 'beast' | 'flyer' | 'construct';
-  weapon?: 'spear' | 'sword' | 'axe' | 'bow' | 'sling' | 'staff' | 'tool' | 'none';
+  weapon?:
+    | 'spear'
+    | 'sword'
+    | 'axe'
+    | 'bow'
+    | 'sling'
+    | 'staff'
+    | 'tool'
+    | 'javelin'
+    | 'greatsword'
+    | 'greataxe'
+    | 'horn'
+    | 'banner'
+    | 'none';
   /** Main body colour; team colour is applied to cloth/banners automatically. */
   body: string;
   accent?: string;
   /** Drawing scale relative to a worker. */
   scale?: number;
+  /** Detail overrides for humanoids (defaults follow faction and class). */
+  helm?:
+    'none' | 'cap' | 'nasal' | 'horned' | 'wolfhood' | 'crested' | 'plumed' | 'nemes' | 'crown';
+  armor?: 'cloth' | 'fur' | 'leather' | 'mail' | 'scale' | 'plate' | 'linen';
+  shield?: 'none' | 'round' | 'hoplon' | 'tower' | 'oval';
+  cape?: boolean;
+  /** Riders: what they ride (defaults by faction). */
+  mount?: 'horse' | 'wolf' | 'chariot' | 'camel';
 }
+
+/** Special combat traits (see src/data/traits.ts for names, numbers and descriptions). */
+export type TraitId =
+  | 'brace'
+  | 'shieldwall'
+  | 'frenzy'
+  | 'charge'
+  | 'cleave'
+  | 'phalanx'
+  | 'piercing'
+  | 'demolisher'
+  | 'regenerate'
+  | 'inspire'
+  | 'harrier'
+  | 'scout';
 
 export type HeroAbilityKind = 'thunderclap' | 'rally' | 'mend';
 
@@ -87,6 +123,10 @@ export interface UnitDef {
   ability?: HeroAbilityDef;
   /** Mythic units: unlocked by this god (in addition to age). */
   god?: string;
+  /** Special combat traits. */
+  traits?: TraitId[];
+  /** One-line role description shown in the codex and tooltips. */
+  role?: LocText;
   art: UnitArt;
 }
 

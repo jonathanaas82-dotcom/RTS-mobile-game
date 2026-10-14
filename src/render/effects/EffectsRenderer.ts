@@ -140,9 +140,7 @@ export class EffectsRenderer {
         this.chips.setParticleTint(0xc8a070);
         this.chips.explode(2, ix, iy - 6);
         break;
-      case 'fish':
-        this.splash(x + facing * 30, y + 4, 3);
-        break;
+      case 'fish': // the bobber's ripple is drawn with the fishing line
       case 'pick':
         break;
     }

@@ -10,6 +10,7 @@ import { drawUnit } from '../../render/assets/procedural/units';
 import { powerIcon } from '../commandCard';
 import { el, onPress } from '../hud/dom';
 import { menuBackdrop } from './backdrop';
+import { renderCodex, type CodexState } from './codex';
 import { saveSettings, type GraphicsQuality, type Settings } from '../settings';
 import { loadStats, saveStats } from '../stats';
 
@@ -39,6 +40,8 @@ const MENU_ICONS = {
     '<svg viewBox="0 0 24 24"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm8.5 4l2-1.5-2-3.5-2.4.8a8 8 0 0 0-1.7-1L16 4h-4l-.4 2.8a8 8 0 0 0-1.7 1L7.5 7 5.5 10.5 7.5 12l-2 1.5 2 3.5 2.4-.8a8 8 0 0 0 1.7 1L12 20h4l.4-2.8a8 8 0 0 0 1.7-1l2.4.8 2-3.5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>',
   stats:
     '<svg viewBox="0 0 24 24"><path d="M5 20V10M12 20V4M19 20v-7" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>',
+  codex:
+    '<svg viewBox="0 0 24 24"><path d="M5 3h11a3 3 0 0 1 3 3v15H8a3 3 0 0 1-3-3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M5 18a3 3 0 0 1 3-3h11M10 7h6M10 10h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
   credits:
     '<svg viewBox="0 0 24 24"><path d="M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6L3.3 9.3l6.1-.7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
 };
@@ -147,13 +150,15 @@ export class Menus {
       'menu-btn primary',
       MENU_ICONS.skirmish,
     );
+    const row0 = el('div', 'menu-row', list);
     this.button(
-      list,
+      row0,
       t('menu.tutorial'),
       () => this.cb.tutorial(),
       'menu-btn',
       MENU_ICONS.tutorial,
     );
+    this.button(row0, t('menu.codex'), () => this.showCodex(), 'menu-btn', MENU_ICONS.codex);
     this.button(
       list,
       t('menu.settings'),
@@ -466,6 +471,39 @@ export class Menus {
       (v) => (st.showDebug = v === 'on'),
     );
     el('p', 'pre-note', body).textContent = t('set.graphicsNote');
+  }
+
+  // ───────────── codex ─────────────
+
+  private codex: CodexState = { tab: 'gods', god: 'thunrak', faction: 'hrimfolk', unit: null };
+
+  showCodex(): void {
+    const s = this.screen('menu-codex');
+    const head = this.header(s, t('menu.codex'), () => this.showMain());
+    const tabs = el('div', 'segmented codex-tabs', head);
+    for (const tab of ['gods', 'units'] as const) {
+      const b = this.button(
+        tabs,
+        t(`codex.${tab}`),
+        () => {
+          this.codex.tab = tab;
+          this.showCodex();
+        },
+        'seg-btn' + (this.codex.tab === tab ? ' selected' : ''),
+      );
+      b.setAttribute('aria-pressed', String(this.codex.tab === tab));
+    }
+    const body = el('div', 'codex-body', s);
+    renderCodex(
+      body,
+      this.codex,
+      () => {
+        const y = this.root.scrollTop;
+        this.showCodex();
+        this.root.scrollTop = y;
+      },
+      () => this.cb.click(),
+    );
   }
 
   // ───────────── stats & credits ─────────────

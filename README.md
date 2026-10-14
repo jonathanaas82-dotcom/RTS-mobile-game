@@ -108,6 +108,10 @@ Everything is data in `src/data`; the simulation, UI and AI pick new entries up 
 
 **A unit:** add a `UnitDef` to `src/data/units.ts` (stats, cost, `trainedAt` building, `age`,
 procedural `art` description; mythic units also need `god`). Add its name in both languages.
+Optional `traits` (see `src/data/traits.ts`: braced spears, shield wall, frenzy, charge, cleave,
+phalanx, piercing, demolisher, regeneration, inspire, harrier, scout) and a one-line `role` show
+up in the in-game Codex and selection panel. Humanoid art takes `helm`, `armor`, `shield`, `cape`
+and riders a `mount`.
 
 **A god:** add a `GodDef` to `src/data/gods.ts` (bonuses as `Modifier`s, a `power` id from
 `src/data/powers.ts`, optional `mythic` unit / `tech`), then list it in its faction's

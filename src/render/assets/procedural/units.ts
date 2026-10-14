@@ -1,16 +1,6 @@
 import type { FactionId, UnitDef } from '../../../data/types';
 import { TILE_PX } from '../tileset';
-import {
-  ART_RES,
-  createCanvas,
-  dgrad,
-  mix,
-  outlined,
-  rgrad,
-  shade,
-  softShadow,
-  vgrad,
-} from './draw';
+import { ART_RES, createCanvas, dgrad, outlined, rgrad, shade, softShadow, vgrad } from './draw';
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -151,7 +141,6 @@ export function drawUnit(def: UnitDef, team: string, pose: Pose = {}): HTMLCanva
   c.restore();
   const [out, oc] = createCanvas(S, S);
   const flying = def.art.shape === 'flyer';
-  if (pose.act === 'fish') fishingLine(oc, S, pose.frame ?? 0);
   softShadow(oc, S * 0.5, S * 0.87, S * (flying ? 0.2 : 0.27), S * 0.07, flying ? 0.25 : 0.4);
   oc.drawImage(outlined(fig, Math.max(2, S / 48)), 0, 0);
   return out;
@@ -159,111 +148,260 @@ export function drawUnit(def: UnitDef, team: string, pose: Pose = {}): HTMLCanva
 
 // ───────────────────────── humanoids ─────────────────────────
 
-/** Faction headwear by role. */
-function head(c: Ctx, def: UnitDef, fx: number, hy: number, s: (v: number) => number): void {
+type Helm = NonNullable<UnitDef['art']['helm']>;
+type Armor = NonNullable<UnitDef['art']['armor']>;
+type ShieldKind = NonNullable<UnitDef['art']['shield']>;
+
+/** Resolved look of a humanoid: explicit art fields, else faction/class defaults. */
+interface Look {
+  helm: Helm;
+  armor: Armor;
+  shield: ShieldKind;
+  cape: boolean;
+}
+
+const DEFAULT_LOOK: Record<
+  FactionId,
+  { worker: [Helm, Armor]; soldier: [Helm, Armor, ShieldKind] }
+> = {
+  hrimfolk: { worker: ['cap', 'fur'], soldier: ['nasal', 'mail', 'round'] },
+  aurelian: { worker: ['none', 'cloth'], soldier: ['crested', 'plate', 'hoplon'] },
+  sahrun: { worker: ['nemes', 'linen'], soldier: ['nemes', 'linen', 'oval'] },
+};
+
+function lookOf(def: UnitDef): Look {
+  const a = def.art;
+  const d = DEFAULT_LOOK[def.faction];
+  const worker = def.cls === 'worker';
+  const shielded = def.cls === 'infantry' || (def.cls === 'hero' && a.weapon !== 'staff');
+  return {
+    helm: a.helm ?? (worker ? d.worker[0] : d.soldier[0]),
+    armor: a.armor ?? (worker ? d.worker[1] : d.soldier[1]),
+    shield: a.shield ?? (shielded ? d.soldier[2] : 'none'),
+    cape: a.cape ?? def.cls === 'hero',
+  };
+}
+
+/** Head, face, hair/beard and headgear. */
+function head(
+  c: Ctx,
+  def: UnitDef,
+  look: Look,
+  fx: number,
+  hy: number,
+  s: (v: number) => number,
+): void {
   const f = def.faction;
   const skin = SKIN[f];
-  const military = def.cls !== 'worker';
-  // Face with soft shading, eye and nose (facing right).
+  const hero = def.cls === 'hero';
+  const metal = hero ? GOLD : f === 'aurelian' ? BRONZE : STEEL;
+  // Face with soft shading, eye, brow and nose (facing right).
   disc(c, fx, hy, s(10), rgrad(c, fx, hy, s(10), skin));
+  oval(c, fx - s(8.5), hy + s(1), s(2), s(3), shade(skin, 0.85)); // ear
   disc(c, fx + s(5), hy - s(1), s(1.5), '#2a1d14');
+  line(c, fx + s(3), hy - s(4), fx + s(7.5), hy - s(3.6), s(1.2), shade(HAIR[f], 0.9));
   oval(c, fx + s(9.5), hy + s(1.5), s(1.6), s(2.2), shade(skin, 0.85));
+  line(c, fx + s(4), hy + s(5.5), fx + s(7), hy + s(5), s(0.9), shade(skin, 0.6)); // mouth
   if (f === 'hrimfolk') {
     // Braided beard.
-    c.fillStyle = HAIR[f];
+    c.fillStyle = vgrad(c, hy, hy + s(16), HAIR[f]);
     c.beginPath();
-    c.moveTo(fx - s(4), hy + s(3));
-    c.quadraticCurveTo(fx + s(4), hy + s(16), fx + s(9), hy + s(4));
-    c.quadraticCurveTo(fx + s(3), hy + s(7), fx - s(4), hy + s(3));
+    c.moveTo(fx - s(5), hy + s(2));
+    c.quadraticCurveTo(fx + s(4), hy + s(18), fx + s(9.5), hy + s(4));
+    c.quadraticCurveTo(fx + s(3), hy + s(7), fx - s(5), hy + s(2));
     c.fill();
-    if (military) {
-      // Rounded iron helm with nose guard.
-      c.fillStyle = dgrad(
-        c,
-        fx - s(10),
-        hy - s(14),
-        fx + s(10),
-        hy,
-        def.cls === 'hero' ? '#d8dde6' : STEEL,
-      );
+    line(c, fx + s(3), hy + s(9), fx + s(3.5), hy + s(14), s(1.2), shade(HAIR[f], 0.7));
+    disc(c, fx + s(3.5), hy + s(14.5), s(1.1), GOLD);
+  } else if (f === 'aurelian' && def.cls !== 'worker') {
+    // Short trimmed beard.
+    c.fillStyle = shade(HAIR[f], 0.9);
+    c.beginPath();
+    c.moveTo(fx - s(6), hy + s(1));
+    c.quadraticCurveTo(fx + s(2), hy + s(11), fx + s(9), hy + s(4));
+    c.quadraticCurveTo(fx + s(3), hy + s(6), fx - s(6), hy + s(1));
+    c.fill();
+  }
+  const helmDome = (color: string, from = 1.02, to = 1.98): void => {
+    c.fillStyle = dgrad(c, fx - s(10), hy - s(14), fx + s(10), hy, color);
+    c.beginPath();
+    c.arc(fx, hy - s(2), s(11), Math.PI * from, Math.PI * to);
+    c.closePath();
+    c.fill();
+    // Rivets / highlight.
+    line(c, fx - s(4), hy - s(11.5), fx + s(2), hy - s(12.5), s(1.4), shade(color, 1.4));
+  };
+  switch (look.helm) {
+    case 'none':
+      c.fillStyle = HAIR[f];
       c.beginPath();
-      c.arc(fx, hy - s(2), s(11), Math.PI * 1.02, Math.PI * 1.98);
+      c.arc(fx - s(1), hy - s(2), s(10.5), Math.PI * 0.9, Math.PI * 1.95);
+      c.fill();
+      if (f === 'aurelian') {
+        c.strokeStyle = '#6f9a3a';
+        c.lineWidth = s(2.2);
+        c.beginPath();
+        c.arc(fx, hy - s(1), s(10), Math.PI * 1.05, Math.PI * 1.9);
+        c.stroke();
+      }
+      break;
+    case 'cap':
+      if (f === 'hrimfolk') {
+        c.fillStyle = vgrad(c, hy - s(14), hy - s(2), '#8a6a48');
+        c.beginPath();
+        c.ellipse(fx - s(1), hy - s(6), s(11), s(7), 0, Math.PI, 0);
+        c.fill();
+        for (let i = 0; i < 5; i++)
+          line(
+            c,
+            fx - s(10) + i * s(4.5),
+            hy - s(6),
+            fx - s(9) + i * s(4.5),
+            hy - s(3),
+            s(1),
+            '#5a4430',
+          );
+      } else {
+        // Close-fitting leather cap.
+        helmDome(f === 'sahrun' ? '#b08850' : '#8a6040', 1.0, 2.0);
+        rr(c, fx - s(11), hy - s(3.5), s(22), s(2.5), s(1.2), shade(LEATHER, 0.8));
+      }
+      break;
+    case 'nasal':
+    case 'horned':
+      helmDome(metal);
+      rr(c, fx - s(11), hy - s(3.5), s(22), s(3), s(1.5), shade(metal, 0.75));
+      rr(c, fx + s(5.5), hy - s(3), s(2.5), s(8), s(1), shade(metal, 0.8));
+      if (hero) rr(c, fx - s(11), hy - s(3.5), s(22), s(2), s(1), GOLD);
+      if (look.helm === 'horned') {
+        // Two curved horns sweeping up and outwards.
+        for (const [bx, dir, col] of [
+          [fx - s(7), -1, shade('#e8dcc0', 0.75)],
+          [fx + s(5), 1, '#efe4c8'],
+        ] as const) {
+          c.fillStyle = vgrad(c, hy - s(23), hy - s(8), col);
+          c.beginPath();
+          c.moveTo(bx - s(2.5), hy - s(9));
+          c.quadraticCurveTo(bx + dir * s(10), hy - s(13), bx + dir * s(9), hy - s(22));
+          c.quadraticCurveTo(bx + dir * s(4), hy - s(16), bx + s(2.5), hy - s(9));
+          c.fill();
+        }
+      }
+      break;
+    case 'wolfhood': {
+      // Wolf pelt worn over the head: grey fur, ears, snout over the brow, falling to the back.
+      const fur = '#8d8a86';
+      c.fillStyle = vgrad(c, hy - s(16), hy + s(14), fur);
+      c.beginPath();
+      c.moveTo(fx - s(13), hy + s(14));
+      c.quadraticCurveTo(fx - s(15), hy - s(6), fx - s(4), hy - s(13));
+      c.quadraticCurveTo(fx + s(8), hy - s(15), fx + s(12), hy - s(6));
+      c.lineTo(fx + s(15), hy - s(3));
+      c.lineTo(fx + s(7), hy - s(4));
+      c.quadraticCurveTo(fx - s(4), hy - s(4), fx - s(8), hy + s(6));
       c.closePath();
       c.fill();
-      rr(c, fx - s(11), hy - s(3.5), s(22), s(3), s(1.5), shade(STEEL, 0.75));
-      rr(c, fx + s(5.5), hy - s(3), s(2.5), s(8), s(1), shade(STEEL, 0.8));
-      if (def.cls === 'hero') rr(c, fx - s(11), hy - s(3.5), s(22), s(2), s(1), GOLD);
-    } else {
-      // Fur cap.
-      c.fillStyle = vgrad(c, hy - s(14), hy - s(2), '#8a6a48');
+      c.fillStyle = shade(fur, 0.7);
       c.beginPath();
-      c.ellipse(fx - s(1), hy - s(6), s(11), s(7), 0, Math.PI, 0);
+      c.moveTo(fx - s(3), hy - s(12));
+      c.lineTo(fx - s(1), hy - s(20));
+      c.lineTo(fx + s(3), hy - s(12.5));
       c.fill();
+      disc(c, fx + s(6), hy - s(9), s(1.2), '#ffd84a');
+      oval(c, fx + s(14.5), hy - s(4), s(1.8), s(1.4), '#1a1410');
+      for (let i = 0; i < 4; i++)
+        line(
+          c,
+          fx - s(12) + i * s(1.5),
+          hy + s(2) + i * s(3),
+          fx - s(9) + i * s(1.5),
+          hy + s(4) + i * s(3),
+          s(0.9),
+          shade(fur, 0.6),
+        );
+      break;
     }
-  } else if (f === 'aurelian') {
-    if (military) {
-      // Bronze helmet with cheek guard and a tall crest.
-      const helm = def.cls === 'hero' ? GOLD : BRONZE;
-      c.fillStyle = dgrad(c, fx - s(11), hy - s(13), fx + s(10), hy + s(4), helm);
+    case 'crested':
+    case 'plumed': {
+      // Bronze helmet with cheek guard; a transverse crest or a tall flowing plume.
+      c.fillStyle = dgrad(c, fx - s(11), hy - s(13), fx + s(10), hy + s(4), metal);
       c.beginPath();
       c.arc(fx, hy - s(1), s(11), Math.PI * 0.95, Math.PI * 2.05);
       c.lineTo(fx + s(4), hy + s(6));
       c.lineTo(fx - s(9), hy + s(6));
       c.closePath();
       c.fill();
+      line(c, fx - s(10), hy - s(4), fx + s(10), hy - s(4), s(1.5), shade(metal, 0.7));
+      line(c, fx - s(5), hy - s(11), fx + s(3), hy - s(12), s(1.5), shade(metal, 1.45));
       disc(c, fx + s(5), hy - s(1), s(1.5), '#1a120c');
-      c.fillStyle = vgrad(c, hy - s(26), hy - s(9), def.cls === 'hero' ? '#f3e6c4' : '#b0473a');
+      const plume = hero
+        ? '#f3e6c4'
+        : def.art.accent && look.helm === 'plumed'
+          ? def.art.accent
+          : '#b0473a';
+      c.fillStyle = vgrad(c, hy - s(30), hy - s(9), plume);
       c.beginPath();
-      c.moveTo(fx - s(12), hy - s(10));
-      c.quadraticCurveTo(fx - s(4), hy - s(28), fx + s(9), hy - s(13));
-      c.quadraticCurveTo(fx - s(2), hy - s(17), fx - s(12), hy - s(10));
-      c.fill();
-    } else {
-      c.fillStyle = HAIR[f];
-      c.beginPath();
-      c.arc(fx - s(1), hy - s(2), s(10.5), Math.PI * 0.9, Math.PI * 1.95);
-      c.fill();
-      // Laurel band.
-      c.strokeStyle = '#6f9a3a';
-      c.lineWidth = s(2.2);
-      c.beginPath();
-      c.arc(fx, hy - s(1), s(10), Math.PI * 1.05, Math.PI * 1.9);
-      c.stroke();
-    }
-  } else {
-    // Sahrun: striped headcloth falling to the shoulders; heroes wear a tall golden crown.
-    const cloth = military ? '#2f5fa0' : '#efe6cf';
-    c.fillStyle = vgrad(c, hy - s(12), hy + s(10), cloth);
-    c.beginPath();
-    c.moveTo(fx - s(11), hy + s(9));
-    c.lineTo(fx - s(12), hy - s(4));
-    c.arc(fx, hy - s(3), s(11), Math.PI, Math.PI * 2);
-    c.lineTo(fx + s(6), hy + s(1));
-    c.lineTo(fx - s(5), hy + s(9));
-    c.closePath();
-    c.fill();
-    if (military) {
-      for (let i = 0; i < 3; i++)
-        line(
-          c,
-          fx - s(10) + i * s(1.5),
-          hy - s(6) + i * s(5),
-          fx - s(4) + i * s(1.5),
-          hy - s(6) + i * s(5),
-          s(1.6),
-          GOLD,
-        );
-    }
-    if (def.cls === 'hero') {
-      c.fillStyle = dgrad(c, fx - s(8), hy - s(26), fx + s(8), hy - s(10), GOLD);
-      c.beginPath();
-      c.moveTo(fx - s(8), hy - s(11));
-      c.lineTo(fx - s(5), hy - s(26));
-      c.lineTo(fx + s(5), hy - s(26));
-      c.lineTo(fx + s(8), hy - s(11));
+      if (look.helm === 'crested') {
+        c.moveTo(fx - s(12), hy - s(10));
+        c.quadraticCurveTo(fx - s(4), hy - s(28), fx + s(9), hy - s(13));
+        c.quadraticCurveTo(fx - s(2), hy - s(17), fx - s(12), hy - s(10));
+      } else {
+        c.moveTo(fx + s(2), hy - s(12));
+        c.quadraticCurveTo(fx - s(2), hy - s(25), fx - s(16), hy - s(21));
+        c.quadraticCurveTo(fx - s(24), hy - s(14), fx - s(20), hy + s(2));
+        c.quadraticCurveTo(fx - s(16), hy - s(14), fx - s(4), hy - s(12));
+      }
       c.closePath();
       c.fill();
-      disc(c, fx, hy - s(18), s(2.5), '#2f5fa0');
+      for (let i = 0; i < 4; i++)
+        line(
+          c,
+          fx - s(8) + i * s(3),
+          hy - s(14) - i * s(2),
+          fx - s(6) + i * s(3),
+          hy - s(20) - i * s(1.5),
+          s(0.8),
+          shade(plume, 0.75),
+        );
+      break;
+    }
+    case 'nemes':
+    case 'crown': {
+      // Striped headcloth falling to the shoulders; heroes wear a tall golden crown above.
+      const cloth = def.cls === 'worker' ? '#efe6cf' : '#2f5fa0';
+      c.fillStyle = vgrad(c, hy - s(12), hy + s(10), cloth);
+      c.beginPath();
+      c.moveTo(fx - s(11), hy + s(9));
+      c.lineTo(fx - s(12), hy - s(4));
+      c.arc(fx, hy - s(3), s(11), Math.PI, Math.PI * 2);
+      c.lineTo(fx + s(6), hy + s(1));
+      c.lineTo(fx - s(5), hy + s(9));
+      c.closePath();
+      c.fill();
+      const stripe = def.cls === 'worker' ? '#c9a24a' : GOLD;
+      for (let i = 0; i < 4; i++)
+        line(
+          c,
+          fx - s(11) + i * s(1.2),
+          hy - s(8) + i * s(4.5),
+          fx - s(4) + i * s(1.2),
+          hy - s(8) + i * s(4.5),
+          s(1.4),
+          stripe,
+        );
+      rr(c, fx - s(11), hy - s(5), s(18), s(2.2), s(1), GOLD);
+      if (look.helm === 'crown') {
+        c.fillStyle = dgrad(c, fx - s(8), hy - s(28), fx + s(8), hy - s(10), GOLD);
+        c.beginPath();
+        c.moveTo(fx - s(8), hy - s(11));
+        c.lineTo(fx - s(5), hy - s(23));
+        c.lineTo(fx + s(5), hy - s(23));
+        c.lineTo(fx + s(8), hy - s(11));
+        c.closePath();
+        c.fill();
+        disc(c, fx, hy - s(17), s(2.6), '#2f5fa0');
+        disc(c, fx, hy - s(17), s(1.2), '#7fd0ff');
+      }
+      break;
     }
   }
 }
@@ -272,6 +410,45 @@ function weapon(c: Ctx, def: UnitDef, hx: number, hy: number, s: (v: number) => 
   const w = def.art.weapon ?? 'none';
   const metal = def.faction === 'aurelian' ? BRONZE : STEEL;
   switch (w) {
+    case 'javelin':
+      line(c, hx - s(10), hy + s(8), hx + s(14), hy - s(34), s(2.2), WOOD);
+      c.fillStyle = dgrad(c, hx + s(12), hy - s(42), hx + s(18), hy - s(32), metal);
+      c.beginPath();
+      c.moveTo(hx + s(17), hy - s(42));
+      c.lineTo(hx + s(16), hy - s(32));
+      c.lineTo(hx + s(12), hy - s(34));
+      c.closePath();
+      c.fill();
+      break;
+    case 'greatsword': {
+      const g = c.createLinearGradient(hx, hy, hx + s(20), hy - s(36));
+      g.addColorStop(0, '#f4f7fb');
+      g.addColorStop(1, '#8e98a4');
+      c.fillStyle = g;
+      c.beginPath();
+      c.moveTo(hx + s(1), hy - s(4));
+      c.lineTo(hx + s(20), hy - s(38));
+      c.lineTo(hx + s(23), hy - s(36));
+      c.lineTo(hx + s(5), hy - s(2));
+      c.closePath();
+      c.fill();
+      line(c, hx + s(3), hy - s(3), hx + s(19), hy - s(33), s(0.8), 'rgba(255,255,255,0.7)');
+      line(c, hx - s(4), hy - s(6), hx + s(8), hy + s(1), s(3), GOLD);
+      line(c, hx, hy, hx - s(4), hy + s(7), s(2.6), LEATHER);
+      disc(c, hx - s(4.5), hy + s(8), s(2), GOLD);
+      break;
+    }
+    case 'greataxe':
+      line(c, hx - s(4), hy + s(14), hx + s(10), hy - s(32), s(3.4), WOOD);
+      c.fillStyle = dgrad(c, hx + s(6), hy - s(40), hx + s(26), hy - s(14), metal);
+      c.beginPath();
+      c.moveTo(hx + s(8), hy - s(30));
+      c.quadraticCurveTo(hx + s(30), hy - s(40), hx + s(24), hy - s(12));
+      c.quadraticCurveTo(hx + s(16), hy - s(20), hx + s(6), hy - s(20));
+      c.closePath();
+      c.fill();
+      line(c, hx + s(22), hy - s(34), hx + s(25), hy - s(15), s(1.2), 'rgba(255,255,255,0.6)');
+      break;
     case 'spear':
       line(c, hx - s(2), hy + s(16), hx + s(8), hy - s(42), s(3), WOOD);
       c.fillStyle = dgrad(c, hx + s(4), hy - s(54), hx + s(12), hy - s(40), metal);
@@ -348,6 +525,358 @@ function weapon(c: Ctx, def: UnitDef, hx: number, hy: number, s: (v: number) => 
   }
 }
 
+/** A leg (thigh to boot) pivoting at the hip by `ang` radians, dressed for the armour type. */
+function leg(
+  c: Ctx,
+  x: number,
+  y: number,
+  ang: number,
+  s: (v: number) => number,
+  look: Look,
+  f: FactionId,
+  pants: string,
+  far: boolean,
+): void {
+  const bare = f !== 'hrimfolk';
+  const tone = (col: string): string => (far ? shade(col, 0.88) : col);
+  c.save();
+  c.translate(x, y);
+  c.rotate(-ang);
+  const skin = SKIN[f];
+  rr(c, -s(3.75), 0, s(7.5), s(19), s(3), vgrad(c, 0, s(19), tone(bare ? skin : pants)));
+  if (look.armor === 'plate' || look.armor === 'scale') {
+    // Bronze/steel greave over the shin.
+    const m = f === 'aurelian' || look.armor === 'plate' ? BRONZE : STEEL;
+    rr(c, -s(4.2), s(8), s(8.4), s(10), s(3), dgrad(c, -s(4), s(8), s(4), s(18), tone(m)));
+  } else if (f === 'hrimfolk') {
+    // Cross-gartered leg wraps.
+    for (let i = 0; i < 3; i++)
+      line(c, -s(3.5), s(9) + i * s(3), s(3.5), s(11) + i * s(3), s(1), shade(pants, 0.6));
+  }
+  if (bare && look.armor !== 'plate') {
+    // Sandal straps.
+    line(c, -s(3.5), s(15), s(3.5), s(17), s(1), LEATHER);
+    rr(c, -s(4.5), s(18), s(10), s(3.5), s(1.5), tone(LEATHER));
+  } else rr(c, -s(4.5), s(16), s(10), s(6.5), s(2.5), tone(f === 'hrimfolk' ? '#4a3626' : LEATHER));
+  c.restore();
+}
+
+/** Torso outline shared by the clothing layers. */
+function torsoPath(c: Ctx, fx: number, fy: number, s: (v: number) => number): void {
+  c.beginPath();
+  c.moveTo(fx - s(13), fy - s(20));
+  c.lineTo(fx - s(12), fy - s(46));
+  c.quadraticCurveTo(fx, fy - s(54), fx + s(12), fy - s(46));
+  c.lineTo(fx + s(13), fy - s(20));
+  c.closePath();
+}
+
+/** Body armour/clothing by type, with team colours and belt. */
+function torso(
+  c: Ctx,
+  def: UnitDef,
+  look: Look,
+  team: string,
+  fx: number,
+  fy: number,
+  s: (v: number) => number,
+): void {
+  const f = def.faction;
+  const body = def.art.body;
+  const hero = def.cls === 'hero';
+  const metal = hero ? GOLD : f === 'aurelian' ? BRONZE : STEEL;
+  const base: Record<Armor, string> = {
+    cloth: body,
+    fur: shade(body, 0.9),
+    leather: '#7a5230',
+    mail: STEEL,
+    scale: metal,
+    plate: metal,
+    linen: '#efe6cf',
+  };
+  c.fillStyle = vgrad(c, fy - s(52), fy - s(20), base[look.armor]);
+  torsoPath(c, fx, fy, s);
+  c.fill();
+  c.save();
+  torsoPath(c, fx, fy, s);
+  c.clip();
+  const tabard = (): void => {
+    c.fillStyle = vgrad(c, fy - s(48), fy - s(18), team, 1.25, 0.75);
+    c.beginPath();
+    c.moveTo(fx - s(6), fy - s(48));
+    c.lineTo(fx + s(6), fy - s(48));
+    c.lineTo(fx + s(7), fy - s(17));
+    c.lineTo(fx, fy - s(20));
+    c.lineTo(fx - s(7), fy - s(17));
+    c.closePath();
+    c.fill();
+    disc(c, fx, fy - s(38), s(2.6), shade(team, 1.6));
+  };
+  switch (look.armor) {
+    case 'cloth':
+      tabard();
+      break;
+    case 'fur':
+      // Shaggy fur vest edges and a team sash.
+      for (let i = 0; i < 9; i++) {
+        const y = fy - s(48) + i * s(3.2);
+        line(c, fx - s(13), y, fx - s(7), y + s(2), s(1.6), i % 2 ? '#d8c8a8' : '#a8916c');
+        line(c, fx + s(13), y, fx + s(8), y + s(2), s(1.6), i % 2 ? '#d8c8a8' : '#a8916c');
+      }
+      line(c, fx - s(10), fy - s(48), fx + s(9), fy - s(24), s(4), team);
+      break;
+    case 'leather':
+      for (let i = 0; i < 4; i++)
+        line(
+          c,
+          fx - s(12),
+          fy - s(42) + i * s(6),
+          fx + s(12),
+          fy - s(42) + i * s(6),
+          s(0.8),
+          shade('#7a5230', 0.6),
+        );
+      line(c, fx - s(10), fy - s(48), fx + s(9), fy - s(24), s(3.5), team);
+      line(c, fx - s(10), fy - s(48), fx + s(9), fy - s(24), s(0.8), shade(team, 1.5));
+      break;
+    case 'mail': {
+      // Ring texture under a team tabard.
+      c.strokeStyle = shade(STEEL, 0.62);
+      c.lineWidth = s(0.7);
+      for (let y = fy - s(52); y < fy - s(18); y += s(2.6))
+        for (let x = fx - s(14) + ((y / s(2.6)) % 2) * s(1.3); x < fx + s(14); x += s(2.6)) {
+          c.beginPath();
+          c.arc(x, y, s(1.1), 0, Math.PI);
+          c.stroke();
+        }
+      tabard();
+      break;
+    }
+    case 'scale': {
+      c.strokeStyle = shade(metal, 0.6);
+      c.lineWidth = s(0.8);
+      let row = 0;
+      for (let y = fy - s(50); y < fy - s(18); y += s(3), row++)
+        for (let x = fx - s(14) + (row % 2) * s(1.8); x < fx + s(14); x += s(3.6)) {
+          c.beginPath();
+          c.arc(x, y, s(1.8), 0, Math.PI);
+          c.stroke();
+        }
+      rr(c, fx - s(2.5), fy - s(48), s(5), s(26), s(1), team);
+      break;
+    }
+    case 'plate':
+      // Sculpted cuirass: chest and abdominal lines, a bright sheen.
+      c.strokeStyle = shade(metal, 0.62);
+      c.lineWidth = s(1.1);
+      c.beginPath();
+      c.moveTo(fx - s(9), fy - s(40));
+      c.quadraticCurveTo(fx - s(4), fy - s(36), fx, fy - s(39));
+      c.quadraticCurveTo(fx + s(4), fy - s(36), fx + s(9), fy - s(40));
+      c.moveTo(fx, fy - s(39));
+      c.lineTo(fx, fy - s(24));
+      c.moveTo(fx - s(6), fy - s(31));
+      c.lineTo(fx + s(6), fy - s(31));
+      c.stroke();
+      oval(c, fx - s(5), fy - s(45), s(4), s(2.5), 'rgba(255,255,255,0.35)');
+      break;
+    case 'linen': {
+      for (let i = 0; i < 7; i++)
+        line(
+          c,
+          fx - s(10) + i * s(3.3),
+          fy - s(44),
+          fx - s(11) + i * s(3.6),
+          fy - s(20),
+          s(0.6),
+          'rgba(140,120,80,0.45)',
+        );
+      // Broad beaded collar.
+      const ring = (r: number, col: string, w: number): void => {
+        c.strokeStyle = col;
+        c.lineWidth = s(w);
+        c.beginPath();
+        c.arc(fx, fy - s(52), s(r), Math.PI * 0.15, Math.PI * 0.85);
+        c.stroke();
+      };
+      ring(6, GOLD, 2.2);
+      ring(8.3, '#3aa8a0', 2);
+      ring(10.5, team, 2);
+      ring(12.5, GOLD, 1.6);
+      break;
+    }
+  }
+  c.restore();
+  // Belt with buckle.
+  rr(c, fx - s(13), fy - s(26), s(26), s(4), s(2), LEATHER);
+  rr(c, fx - s(2), fy - s(26.5), s(4), s(5), s(1), GOLD);
+  // Shoulder guards for armoured troops.
+  if (look.armor === 'mail' || look.armor === 'scale' || look.armor === 'plate') {
+    const m = look.armor === 'mail' ? STEEL : metal;
+    oval(
+      c,
+      fx - s(10),
+      fy - s(46),
+      s(5.5),
+      s(4.2),
+      dgrad(c, fx - s(15), fy - s(50), fx - s(5), fy - s(42), m),
+    );
+    line(c, fx - s(14), fy - s(44), fx - s(6), fy - s(43), s(0.8), shade(m, 0.6));
+  } else if (look.armor === 'fur') {
+    oval(c, fx - s(9), fy - s(47), s(6), s(4), vgrad(c, fy - s(51), fy - s(43), '#c8b48c'));
+  }
+}
+
+/** Skirt below the belt: pteruges, pleated kilt or tunic hem. */
+function kilt(
+  c: Ctx,
+  def: UnitDef,
+  look: Look,
+  team: string,
+  fx: number,
+  fy: number,
+  s: (v: number) => number,
+): void {
+  const f = def.faction;
+  if (f === 'aurelian' && (look.armor === 'plate' || look.armor === 'scale')) {
+    for (let i = 0; i < 7; i++) {
+      const x = fx - s(12) + i * s(3.6);
+      rr(
+        c,
+        x,
+        fy - s(23),
+        s(3.2),
+        s(10),
+        s(1),
+        vgrad(c, fy - s(23), fy - s(13), i % 2 ? team : '#e8dcc0'),
+      );
+    }
+  } else if (f === 'sahrun') {
+    c.fillStyle = vgrad(c, fy - s(24), fy - s(12), '#f2ead6');
+    c.beginPath();
+    c.moveTo(fx - s(12), fy - s(24));
+    c.lineTo(fx + s(12), fy - s(24));
+    c.lineTo(fx + s(14), fy - s(12));
+    c.lineTo(fx - s(13), fy - s(12));
+    c.closePath();
+    c.fill();
+    for (let i = 0; i < 6; i++)
+      line(
+        c,
+        fx - s(10) + i * s(4),
+        fy - s(23),
+        fx - s(11) + i * s(4.6),
+        fy - s(12.5),
+        s(0.6),
+        'rgba(140,120,80,0.5)',
+      );
+    rr(c, fx - s(3), fy - s(24), s(6), s(11), s(1), team);
+  } else {
+    c.fillStyle = vgrad(c, fy - s(24), fy - s(14), shade(def.art.body, 0.8));
+    c.beginPath();
+    c.moveTo(fx - s(12), fy - s(24));
+    c.lineTo(fx + s(12), fy - s(24));
+    c.lineTo(fx + s(13), fy - s(15));
+    c.lineTo(fx - s(13), fy - s(15));
+    c.closePath();
+    c.fill();
+  }
+}
+
+/** Shield on the off-hand side. */
+function shieldArt(
+  c: Ctx,
+  kind: ShieldKind,
+  team: string,
+  sx: number,
+  sy: number,
+  s: (v: number) => number,
+): void {
+  switch (kind) {
+    case 'round': {
+      // Planked wood painted in team quarters, iron rim and boss.
+      disc(c, sx, sy, s(12), shade(STEEL, 0.7));
+      disc(c, sx, sy, s(10.5), rgrad(c, sx, sy, s(10.5), team));
+      c.fillStyle = shade(team, 0.55);
+      c.beginPath();
+      c.moveTo(sx, sy);
+      c.arc(sx, sy, s(10.5), 0, Math.PI / 2);
+      c.closePath();
+      c.moveTo(sx, sy);
+      c.arc(sx, sy, s(10.5), Math.PI, Math.PI * 1.5);
+      c.closePath();
+      c.fill();
+      for (let i = -2; i <= 2; i++)
+        line(c, sx + i * s(4), sy - s(9.5), sx + i * s(4), sy + s(9.5), s(0.6), 'rgba(0,0,0,0.2)');
+      disc(c, sx, sy, s(3.2), rgrad(c, sx, sy, s(3.2), STEEL));
+      break;
+    }
+    case 'hoplon': {
+      // Large bronze-rimmed round shield with a painted sun emblem.
+      disc(c, sx, sy, s(14), dgrad(c, sx - s(14), sy - s(14), sx + s(14), sy + s(14), BRONZE));
+      disc(c, sx, sy, s(11.5), rgrad(c, sx, sy, s(11.5), team));
+      c.strokeStyle = shade(team, 1.7);
+      c.lineWidth = s(1.4);
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        line(
+          c,
+          sx + Math.cos(a) * s(4),
+          sy + Math.sin(a) * s(4),
+          sx + Math.cos(a) * s(8.5),
+          sy + Math.sin(a) * s(8.5),
+          s(1.4),
+          shade(team, 1.7),
+        );
+      }
+      disc(c, sx, sy, s(3), shade(team, 1.7));
+      break;
+    }
+    case 'tower':
+      rr(
+        c,
+        sx - s(9),
+        sy - s(18),
+        s(18),
+        s(34),
+        s(6),
+        dgrad(c, sx - s(9), sy - s(18), sx + s(9), sy + s(16), shade(team, 0.6)),
+      );
+      rr(c, sx - s(7), sy - s(16), s(14), s(30), s(5), vgrad(c, sy - s(16), sy + s(14), team));
+      line(c, sx, sy - s(15), sx, sy + s(13), s(2), GOLD);
+      for (let i = 0; i < 3; i++)
+        disc(c, sx - s(3.5) + i * s(3.5), sy - s(9) + i * s(9), s(1.6), '#f2ead6');
+      break;
+    case 'oval':
+      oval(c, sx, sy, s(9), s(14), shade(team, 0.55));
+      oval(c, sx, sy, s(7), s(12), vgrad(c, sy - s(12), sy + s(12), team));
+      line(c, sx, sy - s(10), sx, sy + s(10), s(2), GOLD);
+      disc(c, sx, sy, s(2.2), GOLD);
+      break;
+    case 'none':
+      break;
+  }
+}
+
+/** Hero/officer cape hanging behind the body. */
+function capeArt(c: Ctx, team: string, fx: number, fy: number, s: (v: number) => number): void {
+  c.fillStyle = vgrad(c, fy - s(52), fy - s(6), team, 1.1, 0.55);
+  c.beginPath();
+  c.moveTo(fx - s(9), fy - s(50));
+  c.quadraticCurveTo(fx - s(26), fy - s(22), fx - s(20), fy - s(5));
+  c.quadraticCurveTo(fx - s(9), fy - s(10), fx + s(2), fy - s(12));
+  c.lineTo(fx + s(4), fy - s(48));
+  c.closePath();
+  c.fill();
+  // Gold hem.
+  c.strokeStyle = GOLD;
+  c.lineWidth = s(1.5);
+  c.beginPath();
+  c.moveTo(fx - s(20), fy - s(5));
+  c.quadraticCurveTo(fx - s(9), fy - s(10), fx + s(2), fy - s(12));
+  c.stroke();
+}
+
 /** Humanoid with feet at (fx, fy); `k` scales it (riders use a smaller one). */
 function humanoid(
   c: Ctx,
@@ -359,76 +888,54 @@ function humanoid(
   pose: Pose = {},
 ): void {
   const s = (v: number): number => v * k;
-  const body = def.art.body;
   const f = def.faction;
   const skin = SKIN[f];
-  const pants = shade(body, 0.55);
-  const military = def.cls !== 'worker';
-  // Hero cape behind everything.
-  if (def.cls === 'hero') {
-    c.fillStyle = vgrad(c, fy - s(52), fy - s(6), team, 1.1, 0.6);
-    c.beginPath();
-    c.moveTo(fx - s(9), fy - s(50));
-    c.quadraticCurveTo(fx - s(24), fy - s(20), fx - s(18), fy - s(6));
-    c.lineTo(fx + s(2), fy - s(14));
-    c.lineTo(fx + s(4), fy - s(48));
-    c.closePath();
-    c.fill();
+  const look = lookOf(def);
+  const pants = shade(def.art.body, 0.55);
+  const armored = look.armor === 'mail' || look.armor === 'scale' || look.armor === 'plate';
+  const weaponKind = def.art.weapon ?? 'none';
+  if (look.cape) capeArt(c, team, fx, fy, s);
+  // Javelins / quiver carried on the back.
+  if (!pose.act && !pose.carry) {
+    if (weaponKind === 'javelin')
+      for (let i = 0; i < 2; i++)
+        line(c, fx - s(14) + i * s(3), fy - s(18), fx - s(4) + i * s(3), fy - s(62), s(1.8), WOOD);
+    if (weaponKind === 'bow') {
+      rr(c, fx - s(16), fy - s(54), s(6.5), s(20), s(2), vgrad(c, fy - s(54), fy - s(34), LEATHER));
+      for (let i = 0; i < 3; i++)
+        line(
+          c,
+          fx - s(14) + i * s(1.8),
+          fy - s(54),
+          fx - s(15) + i * s(1.8),
+          fy - s(59),
+          s(1.4),
+          '#efe6cf',
+        );
+    }
   }
-  // Back arm.
+  // Back arm, with a bracer on armoured or leather-clad troops.
   line(c, fx - s(8), fy - s(44), fx - s(14), fy - s(26), s(6), shade(skin, 0.8));
-  // Legs with boots (swung apart mid-stride).
+  if (armored || look.armor === 'leather')
+    line(
+      c,
+      fx - s(12),
+      fy - s(32),
+      fx - s(13.5),
+      fy - s(27),
+      s(6.5),
+      shade(look.armor === 'leather' ? LEATHER : f === 'aurelian' ? BRONZE : STEEL, 0.85),
+    );
+  // Legs.
   if (pose.stride) {
-    leg(c, fx - s(3), fy - s(23), 0.38, s, pants);
-    leg(c, fx + s(3), fy - s(23), -0.32, s, shade(pants, 0.9));
+    leg(c, fx - s(3), fy - s(23), 0.38, s, look, f, pants, true);
+    leg(c, fx + s(3), fy - s(23), -0.32, s, look, f, pants, false);
   } else {
-    rr(c, fx - s(9), fy - s(24), s(7.5), s(20), s(3), vgrad(c, fy - s(24), fy - s(4), pants));
-    rr(
-      c,
-      fx + s(1.5),
-      fy - s(24),
-      s(7.5),
-      s(20),
-      s(3),
-      vgrad(c, fy - s(24), fy - s(4), shade(pants, 0.9)),
-    );
-    rr(c, fx - s(10), fy - s(7), s(9.5), s(7), s(2.5), LEATHER);
-    rr(c, fx + s(1), fy - s(7), s(10.5), s(7), s(2.5), shade(LEATHER, 0.85));
+    leg(c, fx - s(5.25), fy - s(24), 0, s, look, f, pants, true);
+    leg(c, fx + s(5.25), fy - s(24), 0, s, look, f, pants, false);
   }
-  // Torso: armour/clothes with a team-coloured tabard and belt.
-  const torsoColor = military && f === 'hrimfolk' ? mix(body, STEEL, 0.25) : body;
-  c.fillStyle = vgrad(c, fy - s(52), fy - s(20), torsoColor);
-  c.beginPath();
-  c.moveTo(fx - s(13), fy - s(20));
-  c.lineTo(fx - s(12), fy - s(46));
-  c.quadraticCurveTo(fx, fy - s(54), fx + s(12), fy - s(46));
-  c.lineTo(fx + s(13), fy - s(20));
-  c.closePath();
-  c.fill();
-  c.fillStyle = vgrad(c, fy - s(48), fy - s(18), team, 1.25, 0.75);
-  c.beginPath();
-  c.moveTo(fx - s(6), fy - s(48));
-  c.lineTo(fx + s(6), fy - s(48));
-  c.lineTo(fx + s(7), fy - s(17));
-  c.lineTo(fx, fy - s(20));
-  c.lineTo(fx - s(7), fy - s(17));
-  c.closePath();
-  c.fill();
-  // Small emblem on the tabard.
-  disc(c, fx, fy - s(38), s(2.6), shade(team, 1.6));
-  rr(c, fx - s(13), fy - s(26), s(26), s(4), s(2), LEATHER);
-  rr(c, fx - s(2), fy - s(26.5), s(4), s(5), s(1), GOLD);
-  if (military && def.cls !== 'ranged') {
-    // Shoulder plates.
-    oval(
-      c,
-      fx - s(10),
-      fy - s(46),
-      s(5),
-      s(4),
-      dgrad(c, fx - s(15), fy - s(50), fx - s(5), fy - s(42), f === 'aurelian' ? BRONZE : STEEL),
-    );
-  }
+  kilt(c, def, look, team, fx, fy, s);
+  torso(c, def, look, team, fx, fy, s);
   if (pose.carry === 'gold') sack(c, fx - s(12), fy - s(40), s);
   if (pose.carry === 'wood') {
     // Logs balanced across the shoulders, behind the head.
@@ -439,71 +946,80 @@ function humanoid(
       disc(c, lx + s(34), ly + s(2.75), s(2.7), '#d9b07a');
     }
   }
-  head(c, def, fx, fy - s(60), s);
+  head(c, def, look, fx, fy - s(60), s);
   if (pose.act || pose.carry) {
     workerArm(c, pose, fx, fy, s, skin);
     return;
   }
-  // Front arm + hand holding the weapon.
-  const hx = fx + s(14);
-  const hy = fy - s(36);
-  line(c, fx + s(8), fy - s(46), hx, hy, s(6), shade(skin, 0.95));
-  weapon(c, def, hx, hy, s);
-  disc(c, hx, hy, s(3.6), rgrad(c, hx, hy, s(3.6), skin));
-  // Shield on the off-hand for melee soldiers and heroes.
-  if (def.cls === 'infantry' || (def.cls === 'hero' && def.art.weapon !== 'staff')) {
-    const sx = fx - s(13);
-    const sy = fy - s(34);
-    if (f === 'sahrun') {
-      oval(c, sx, sy, s(9), s(14), shade(team, 0.55));
-      oval(c, sx, sy, s(7), s(12), vgrad(c, sy - s(12), sy + s(12), team));
-      line(c, sx, sy - s(10), sx, sy + s(10), s(2), GOLD);
-    } else {
-      const r = f === 'aurelian' ? 13 : 11.5;
-      disc(c, sx, sy, s(r), f === 'aurelian' ? BRONZE : shade(WOOD, 0.9));
-      disc(c, sx, sy, s(r - 2.5), rgrad(c, sx, sy, s(r - 2.5), team));
-      if (f === 'hrimfolk') {
-        line(c, sx - s(8), sy, sx + s(8), sy, s(1.5), shade(team, 0.6));
-        line(c, sx, sy - s(8), sx, sy + s(8), s(1.5), shade(team, 0.6));
-      } else {
-        // Painted emblem: a simple stylised eye.
-        oval(c, sx, sy, s(5), s(2.6), shade(team, 1.7));
-        disc(c, sx, sy, s(1.6), shade(team, 0.4));
-      }
-      disc(c, sx, sy, s(2.5), rgrad(c, sx, sy, s(2.5), GOLD));
-    }
-  }
-  if (def.cls === 'ranged' && def.art.weapon === 'bow') {
-    // Quiver on the back.
-    rr(c, fx - s(15), fy - s(52), s(6), s(18), s(2), LEATHER);
+  const hand = (hx: number, hy: number): void =>
+    disc(c, hx, hy, s(3.6), rgrad(c, hx, hy, s(3.6), skin));
+  if (weaponKind === 'horn') {
+    // War horn raised to the lips.
+    const hx = fx + s(11);
+    const hy = fy - s(55);
+    line(c, fx + s(8), fy - s(46), hx, hy, s(6), shade(skin, 0.95));
+    c.fillStyle = dgrad(c, fx + s(8), fy - s(62), fx + s(28), fy - s(40), '#efe2c0');
+    c.beginPath();
+    c.moveTo(fx + s(8), fy - s(56));
+    c.quadraticCurveTo(fx + s(18), fy - s(62), fx + s(26), fy - s(50));
+    c.lineTo(fx + s(31), fy - s(44));
+    c.lineTo(fx + s(22), fy - s(46));
+    c.quadraticCurveTo(fx + s(17), fy - s(56), fx + s(9), fy - s(53));
+    c.closePath();
+    c.fill();
     for (let i = 0; i < 3; i++)
       line(
         c,
-        fx - s(13) + i * s(1.8),
-        fy - s(52),
-        fx - s(14) + i * s(1.8),
-        fy - s(57),
-        s(1.4),
-        '#efe6cf',
+        fx + s(13) + i * s(4),
+        fy - s(58) + i * s(2),
+        fx + s(13) + i * s(4),
+        fy - s(54) + i * s(2.5),
+        s(1.2),
+        GOLD,
       );
+    hand(hx, hy);
+  } else if (weaponKind === 'banner') {
+    // Standard: tall pole, team flag with an emblem, gilded finial.
+    const hx = fx + s(13);
+    const hy = fy - s(38);
+    line(c, fx + s(8), fy - s(46), hx, hy, s(6), shade(skin, 0.95));
+    line(c, hx, hy + s(30), hx + s(1), hy - s(44), s(2.6), WOOD);
+    c.fillStyle = vgrad(c, hy - s(40), hy - s(14), team, 1.2, 0.7);
+    c.beginPath();
+    c.moveTo(hx + s(1.5), hy - s(40));
+    c.quadraticCurveTo(hx + s(12), hy - s(43), hx + s(22), hy - s(39));
+    c.lineTo(hx + s(21), hy - s(16));
+    c.quadraticCurveTo(hx + s(12), hy - s(20), hx + s(1.5), hy - s(16));
+    c.closePath();
+    c.fill();
+    disc(c, hx + s(11), hy - s(29), s(4.5), GOLD);
+    disc(c, hx + s(11), hy - s(29), s(2.4), shade(team, 0.6));
+    line(c, hx - s(1), hy - s(44), hx + s(3), hy - s(44), s(2.4), GOLD);
+    disc(c, hx + s(1), hy - s(47), s(2.6), rgrad(c, hx + s(1), hy - s(47), s(2.6), GOLD));
+    hand(hx, hy);
+  } else {
+    // Front arm + hand holding the weapon (two-handed weapons are held lower).
+    const two = weaponKind === 'greatsword' || weaponKind === 'greataxe';
+    const hx = fx + s(two ? 12 : 14);
+    const hy = fy - s(two ? 32 : 36);
+    line(c, fx + s(8), fy - s(46), hx, hy, s(6), shade(skin, 0.95));
+    if (armored)
+      line(
+        c,
+        hx - s(4),
+        hy - s(5),
+        hx - s(1),
+        hy - s(1.5),
+        s(6.5),
+        shade(f === 'aurelian' ? BRONZE : STEEL, 0.9),
+      );
+    weapon(c, def, hx, hy, s);
+    hand(hx, hy);
   }
-}
-
-/** A leg with its boot, pivoting at the hip by `ang` radians (positive = swung forward). */
-function leg(
-  c: Ctx,
-  x: number,
-  y: number,
-  ang: number,
-  s: (v: number) => number,
-  pants: string,
-): void {
-  c.save();
-  c.translate(x, y);
-  c.rotate(-ang);
-  rr(c, -s(3.75), 0, s(7.5), s(19), s(3), vgrad(c, 0, s(19), pants));
-  rr(c, -s(4.5), s(16), s(10), s(6.5), s(2.5), LEATHER);
-  c.restore();
+  if (look.shield !== 'none') {
+    const big = look.shield === 'tower' || look.shield === 'hoplon';
+    shieldArt(c, look.shield, team, fx - s(big ? 12 : 13), fy - s(big ? 32 : 34), s);
+  }
 }
 
 /** Tool kinds drawn by `tool()`; the handle runs "up" from the hand before rotation. */
@@ -712,28 +1228,13 @@ function sack(c: Ctx, x: number, y: number, s: (v: number) => number): void {
 
 const ROD_DEG = [35, 46] as const;
 
-/** Fishing line from the rod tip down to a bobber in the water at the right edge. */
-function fishingLine(c: Ctx, S: number, frame: 0 | 1): void {
-  const k = S / 100;
-  // Rod tip: hand at (69, 41) in the design box, tip at local (4, -36) rotated by ROD_DEG.
+/**
+ * Rod tip of the fishing pose in the 100×100 design box (feet at (50, 86)); the renderer draws
+ * the line from here to the fishing spot. Hand at (69, 41), tip at local (4, -36) rotated.
+ */
+export function rodTip(frame: 0 | 1): [number, number] {
   const a = (ROD_DEG[frame] * Math.PI) / 180;
-  const tip = [69 + 4 * Math.cos(a) + 36 * Math.sin(a), 41 + 4 * Math.sin(a) - 36 * Math.cos(a)];
-  const bob = frame === 0 ? [97, 90] : [97, 93];
-  c.save();
-  c.scale(k, k);
-  c.strokeStyle = 'rgba(240,240,230,0.85)';
-  c.lineWidth = 0.7;
-  c.beginPath();
-  c.moveTo(tip[0]!, tip[1]!);
-  c.quadraticCurveTo(tip[0]! + 2, (tip[1]! + bob[1]!) / 2 + 8, bob[0]!, bob[1]!);
-  c.stroke();
-  disc(c, bob[0]!, bob[1]! - 1, 1.8, '#e04030');
-  c.strokeStyle = 'rgba(255,255,255,0.7)';
-  c.lineWidth = 0.6;
-  c.beginPath();
-  c.ellipse(bob[0]!, bob[1]! + 0.5, frame === 0 ? 3 : 5, frame === 0 ? 1 : 1.6, 0, 0, Math.PI * 2);
-  c.stroke();
-  c.restore();
+  return [69 + 4 * Math.cos(a) + 36 * Math.sin(a), 41 + 4 * Math.sin(a) - 36 * Math.cos(a)];
 }
 
 // ───────────────────────── riders & engines ─────────────────────────
@@ -788,9 +1289,52 @@ function mount(c: Ctx, kind: 'horse' | 'wolf', color: string, x: number, y: numb
   }
 }
 
+/** Camel: long legs, a hump and a long curved neck. */
+function camel(c: Ctx, color: string, x: number, y: number): void {
+  const dark = shade(color, 0.72);
+  for (const [lx, d] of [
+    [x - 15, dark],
+    [x + 13, dark],
+    [x - 9, color],
+    [x + 19, color],
+  ] as const) {
+    line(c, lx, y + 4, lx - 1, y + 30, 4.2, d);
+    oval(c, lx - 1, y + 30, 3.4, 1.8, '#3a2c1c');
+  }
+  oval(c, x, y, 24, 11, vgrad(c, y - 11, y + 11, color));
+  oval(c, x - 3, y - 10, 12, 9, vgrad(c, y - 19, y - 2, color));
+  line(c, x - 22, y - 2, x - 27, y + 12, 3, shade(color, 0.5));
+  c.strokeStyle = vgrad(c, y - 34, y, color);
+  c.lineWidth = 8;
+  c.lineCap = 'round';
+  c.beginPath();
+  c.moveTo(x + 18, y - 2);
+  c.quadraticCurveTo(x + 30, y - 6, x + 30, y - 26);
+  c.stroke();
+  oval(c, x + 35, y - 28, 8, 4.5, rgrad(c, x + 35, y - 28, 8, color), 0.2);
+  disc(c, x + 34, y - 30, 1.3, '#140c08');
+  // Tasselled bridle in team-friendly colours.
+  line(c, x + 28, y - 24, x + 38, y - 26, 1.2, '#b0473a');
+  disc(c, x + 27, y - 18, 1.6, GOLD);
+}
+
 function rider(c: Ctx, def: UnitDef, team: string): void {
   const f = def.faction;
-  if (f === 'sahrun') {
+  const kind = def.art.mount ?? (f === 'sahrun' ? 'chariot' : f === 'hrimfolk' ? 'wolf' : 'horse');
+  if (kind === 'camel') {
+    camel(c, def.art.body, 52, 58);
+    c.fillStyle = vgrad(c, 40, 60, team);
+    c.beginPath();
+    c.moveTo(38, 44);
+    c.lineTo(58, 44);
+    c.lineTo(56, 60);
+    c.lineTo(40, 60);
+    c.closePath();
+    c.fill();
+    humanoid(c, def, team, 49, 50, 0.6);
+    return;
+  }
+  if (kind === 'chariot') {
     // Chariot: horse pulling a light car with a standing archer.
     mount(c, 'horse', '#c9a46a', 64, 58);
     line(c, 30, 64, 50, 58, 3, WOOD);
@@ -804,7 +1348,6 @@ function rider(c: Ctx, def: UnitDef, team: string): void {
     humanoid(c, def, team, 24, 54, 0.6);
     return;
   }
-  const kind = f === 'hrimfolk' ? 'wolf' : 'horse';
   mount(c, kind, def.art.body, 52, 58);
   // Saddle cloth in team colour.
   c.fillStyle = vgrad(c, 46, 64, team);

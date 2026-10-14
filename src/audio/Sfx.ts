@@ -30,7 +30,8 @@ export type SoundName =
   | 'pick'
   | 'plop'
   | 'splash'
-  | 'treeFall';
+  | 'treeFall'
+  | 'charge';
 
 const MIN_GAP_MS: Partial<Record<SoundName, number>> = {
   hit: 70,
@@ -46,6 +47,7 @@ const MIN_GAP_MS: Partial<Record<SoundName, number>> = {
   plop: 200,
   splash: 300,
   treeFall: 400,
+  charge: 250,
 };
 
 export class Sfx {
@@ -215,6 +217,12 @@ export class Sfx {
         this.sweep(140 * r, 90, t, 0.35, 'sawtooth', 0.05 * gain);
         this.noiseBurst(t + 0.3, 0.5, 700, 'lowpass', 0.35 * gain);
         this.noiseBurst(t + 0.3, 0.3, 2400, 'bandpass', 0.12 * gain);
+        break;
+      case 'charge':
+        // Hooves and impact: a deep double thump with a rush of air.
+        this.sweep(110 * r, 45, t, 0.18, 'sine', 0.5 * gain);
+        this.sweep(130 * r, 50, t + 0.07, 0.16, 'sine', 0.35 * gain);
+        this.noiseBurst(t, 0.22, 500, 'lowpass', 0.3 * gain);
         break;
       case 'ageUp':
         [392, 523, 659, 784, 1047].forEach((f, i) =>
