@@ -159,7 +159,8 @@ if (run('4')) {
       const d2 = (e) => (e.x - hall.x) ** 2 + (e.y - hall.y) ** 2;
       const spot = w.entities.filter((e) => e.def === 'fish').sort((a, b) => d2(a) - d2(b))[0];
       const ws = w.entities.filter((e) => e.owner === 0 && e.cls === 'worker').slice(0, 2);
-      if (spot) s.issue({ type: 'gather', player: 0, ids: ws.map((e) => e.id), target: spot.id, tile: -1 });
+      if (spot)
+        s.issue({ type: 'gather', player: 0, ids: ws.map((e) => e.id), target: spot.id, tile: -1 });
     }
     for (let k = 0; k < 60; k++) {
       const hits = w.entities.filter((e) => busy(e) === want);
@@ -200,7 +201,9 @@ if (run('2')) {
     const s = window.__godforge.game.scene.getScene('World');
     const w = s.sim.world;
     const mine = (id) =>
-      w.entities.find((e) => e.owner === 0 && e.kind === 'unit' && !e.dead && e.inside < 0 && e.def === id);
+      w.entities.find(
+        (e) => e.owner === 0 && e.kind === 'unit' && !e.dead && e.inside < 0 && e.def === id,
+      );
     let pick = null;
     for (let k = 0; k < 40 && !pick; k++) {
       pick = mine('marble_champion') ?? mine('bronzeguard') ?? mine('signbearer') ?? mine('lancer');
