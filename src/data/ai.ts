@@ -120,12 +120,22 @@ export const AI_GATHER_SPLIT: Array<[number, number, number]> = [
   [0.4, 0.25, 0.35],
 ];
 
+/**
+ * Faction play style on top of the difficulty profile. Hrimfolk earn Favor only by fighting,
+ * so their AI raids earlier with smaller waves (applied as offsets/multipliers).
+ */
+export const AI_STYLE: Record<string, { attackEarlierMin: number; waveScale: number }> = {
+  hrimfolk: { attackEarlierMin: 1.25, waveScale: 0.8 },
+  aurelian: { attackEarlierMin: 0, waveScale: 1 },
+  sahrun: { attackEarlierMin: 0, waveScale: 1 },
+};
+
 /** Base army mix weights per faction (before countering). */
 export const AI_ARMY_MIX: Record<
   string,
   Partial<Record<'infantry' | 'ranged' | 'cavalry' | 'siege', number>>
 > = {
-  hrimfolk: { infantry: 0.55, ranged: 0.25, cavalry: 0.2, siege: 0.1 },
+  hrimfolk: { infantry: 0.5, ranged: 0.2, cavalry: 0.32, siege: 0.1 },
   aurelian: { infantry: 0.4, ranged: 0.3, cavalry: 0.3, siege: 0.1 },
   sahrun: { infantry: 0.42, ranged: 0.3, cavalry: 0.28, siege: 0.1 },
 };

@@ -1,5 +1,5 @@
 import { buildingDef, factionDef, hasTrait, powerDef, techDef, unitDef } from '../data';
-import { AI_ARMY_MIX, AI_GATHER_SPLIT, AI_PROFILES, type AIProfile } from '../data/ai';
+import { AI_ARMY_MIX, AI_GATHER_SPLIT, AI_PROFILES, AI_STYLE, type AIProfile } from '../data/ai';
 import { counterMultiplier } from '../data/counters';
 import type { ResourceKind } from '../data/balance/economy';
 import { SIM } from '../data/balance/sim';
@@ -292,7 +292,22 @@ export class AIController implements Controller {
   private dynamicSplit(p: PlayerState): [number, number, number] {
     const base = AI_GATHER_SPLIT[p.age]!;
     const stock = [p.res.food, p.res.wood, p.res.gold];
-    const adj = base.map((b, i) => b * Math.min(1.6, Math.max(0.4, 1.5 - stock[i]! / 600)));
+    // What we are saving for (next age), so workers move to the resource that's missing.
+    const info = nextAge(p);
+    const goal = info && p.age < this.profile.maxAge ? info.cost : {};
+    const need = [goal.food ?? 0, goal.wood ?? 0, goal.gold ?? 0];
+    // About to be pop-capped: a house's wood is the most urgent need of all.
+    if (p.popCap < 200 && p.popCap - p.pop <= 4)
+      need[1] = need[1]! + (costOf(p, this.world.tick, 'house').wood ?? 0) * 2;
+    const adj = base.map((b, i) => {
+      const s = stock[i]!;
+      const short = Math.max(0, need[i]! - s);
+      let m = Math.min(1.6, Math.max(0.4, 1.5 - s / 600));
+      m *= 1 + Math.min(1.5, short / 400);
+      // A large surplus nobody is spending: move most of its workers elsewhere.
+      if (s > Math.max(700, need[i]! + 400)) m *= 0.35;
+      return b * m;
+    });
     const sum = adj.reduce((a, b) => a + b, 0);
     return adj.map((a) => a / sum) as [number, number, number];
   }
@@ -316,11 +331,15 @@ export class AIController implements Controller {
     const under = diff[2]!;
     if (over.d < 1.5 || under.d > -1.5) return;
     const w = this.world;
-    const mover = workers.find(
-      (u) =>
-        u.order.type === 'gather' && u.carry === 0 && (gatherKind(w, u) ?? u.carryKind) === over.k,
+    // Prefer empty-handed workers, but farmers almost always carry something: fall back to any
+    // worker on the over-staffed resource (they drop at most one load). Big gaps move two.
+    const on = workers.filter(
+      (u) => u.order.type === 'gather' && (gatherKind(w, u) ?? u.carryKind) === over.k,
     );
-    if (mover && this.assign(p, mover, under.k)) {
+    on.sort((a, b) => a.carry - b.carry);
+    const moves = over.d >= 3 && under.d <= -3 ? 2 : 1;
+    for (const mover of on.slice(0, moves)) {
+      if (!this.assign(p, mover, under.k)) break;
       count[over.k]--;
       count[under.k]++;
     }
@@ -333,7 +352,10 @@ export class AIController implements Controller {
     const base = h ?? u;
     if (kind === 'wood') {
       const drop = nearestDropoff(w, u, 'wood') ?? base;
-      const tile = nearestForest(w, drop.x, drop.y, 16);
+      let tile = nearestForest(w, drop.x, drop.y, 16);
+      // Nearby woods used up: walk further rather than deadlock (no wood = no storehouse to
+      // move closer to a new forest, and no houses). A storehouse follows once wood comes in.
+      if (tile < 0) tile = nearestForest(w, base.x, base.y, 40);
       if (tile < 0) return false;
       this.cmd({ type: 'gather', player: this.me, ids: [u.id], target: -1, tile });
       return true;
@@ -562,6 +584,7 @@ export class AIController implements Controller {
   private chooseMilitary(p: PlayerState, ids: string[]): string | null {
     const mix = AI_ARMY_MIX[p.faction] ?? {};
     const totalSeen = Object.values(this.enemyMix).reduce((a, b) => a + (b ?? 0), 0);
+    const w = this.world;
     const weights = ids.map((id) => {
       const cls = unitDef(id).cls;
       let wgt = mix[cls as 'infantry'] ?? 0.2;
@@ -577,6 +600,12 @@ export class AIController implements Controller {
           edge += share * (counterMultiplier(cls, ec) - counterMultiplier(ec, cls));
         }
         wgt *= Math.max(0.15, 1 + edge * 1.5);
+      }
+      // Prefer units we can keep paying for: scale down those that eat a scarce resource.
+      const cost = costOf(p, w.tick, id);
+      for (const k of ['food', 'wood', 'gold'] as const) {
+        const c = cost[k] ?? 0;
+        if (c > 0) wgt *= Math.min(1, Math.max(0.45, p.res[k] / (c * 3)));
       }
       // Several options of the same class share that class's weight.
       wgt /= ids.filter((o) => unitDef(o).cls === cls).length;
@@ -657,11 +686,13 @@ export class AIController implements Controller {
     const minutes = w.tick / TPS / 60;
     const pop = army.reduce((s, u) => s + unitDef(u.def).pop, 0);
     if (!this.wave) {
-      const need = Math.min(
-        this.profile.wavePop + this.profile.waveGrowth * this.wavesSent,
-        this.profile.wavePop * 2.2,
-      );
-      if (minutes >= this.profile.firstAttackMin && pop >= need) {
+      const style = AI_STYLE[w.players[this.me]!.faction] ?? { attackEarlierMin: 0, waveScale: 1 };
+      const need =
+        Math.min(
+          this.profile.wavePop + this.profile.waveGrowth * this.wavesSent,
+          this.profile.wavePop * 2.2,
+        ) * style.waveScale;
+      if (minutes >= this.profile.firstAttackMin - style.attackEarlierMin && pop >= need) {
         const t = this.attackTarget();
         this.wave = { launched: w.tick, strength: this.strength(army), tx: t.x, ty: t.y };
         this.cmd({

@@ -52,7 +52,7 @@ export const FACTIONS: FactionDef[] = [
     favorDesc: { en: 'Build Monuments for steady Favor.', nb: 'Bygg monumenter for jevn gunst.' },
     worker: 'toiler',
     bonuses: [
-      { stat: 'hp', mul: 1.25, classes: ['building'] },
+      { stat: 'hp', mul: 1.15, classes: ['building'] },
       { stat: 'gather', mul: 1.05 },
       { stat: 'trainTime', mul: 1.05, classes: ['infantry', 'ranged', 'cavalry'] },
     ],

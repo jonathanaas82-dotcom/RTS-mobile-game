@@ -723,8 +723,8 @@ export const UNITS: UnitDef[] = [
     pop: 1,
     age: 0,
     trainedAt: 'town_hall',
-    gather: { food: 0.77, wood: 0.68, gold: 0.72 },
-    carry: 12,
+    gather: { food: 0.74, wood: 0.66, gold: 0.69 },
+    carry: 11,
     buildRate: 1.15,
     role: { en: 'Hard-working builder and gatherer.', nb: 'Hardtarbeidende byggmester og samler.' },
     art: {

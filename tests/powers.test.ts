@@ -1,3 +1,4 @@
+import { buildingDef } from '../src/data';
 import { describe, expect, it } from 'vitest';
 import { modified } from '../src/sim/player';
 import { placeBuilding, spawnUnit } from '../src/sim/world';
@@ -146,8 +147,8 @@ describe('favor income', () => {
             }
     }
     run(sim, 20 * 30);
-    expect(w.players[0]!.res.favor).toBeCloseTo(0.18 * 30, 0);
+    expect(w.players[0]!.res.favor).toBeCloseTo(buildingDef('shrine').favorRate! * 30, 0);
     // Merit-Asha: +25% monument favor.
-    expect(w.players[1]!.res.favor).toBeCloseTo(0.3 * 1.25 * 30, 0);
+    expect(w.players[1]!.res.favor).toBeCloseTo(buildingDef('monument').favorRate! * 1.25 * 30, 0);
   });
 });
