@@ -33,6 +33,11 @@ export const MAPGEN = {
   featureSpacing: 4,
   /** Width (tiles) of the corridor carved if the bases are not connected. */
   corridorWidth: 2,
+  /** Fishing: a shoal near each base if water lies within this many tiles, plus extras. */
+  homeFishDistance: 14,
+  extraFishSpots: 3,
+  fishSpacing: 5,
+  foodPerFish: 400,
   goldPerMine: 4000,
   foodPerBerryBush: 200,
   woodPerTree: 150,

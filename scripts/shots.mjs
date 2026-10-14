@@ -24,9 +24,9 @@ async function open(url) {
   await page.waitForFunction(() => window.__godforge?.ctx?.match != null, null, { timeout: 30000 });
 }
 
-async function shot(name, prep, wait = 1400) {
+async function shot(name, prep, wait = 1400, arg = null) {
   if (only && !name.startsWith(only)) return;
-  const info = await page.evaluate(prep);
+  const info = await page.evaluate(prep, arg);
   await page.waitForTimeout(wait);
   // Headless frames are slow, so a camera flash lingers far longer than on a device: clear it.
   await page.evaluate(() =>
@@ -138,6 +138,39 @@ if (run('1')) {
     const st = w.map.starts[0];
     s.centerOnTile(st.x + 12, st.y + 8);
   });
+}
+
+// ── Match 4: workers at work (fishing, chopping, mining, farming) ──
+if (run('4')) {
+  await open('?play=1&demo=1&seed=valhollow&faction=hrimfolk&god=thunrak');
+  const frame = (want) => {
+    const s = window.__godforge.game.scene.getScene('World');
+    const w = s.sim.world;
+    const busy = (e) => {
+      if (e.owner !== 0 || e.cls !== 'worker' || e.x !== e.px || e.y !== e.py) return null;
+      if (e.order.type === 'build') return 'build';
+      if (e.order.type !== 'gather') return null;
+      if (e.order.tile >= 0) return 'chop';
+      return w.byId.get(e.order.target)?.def ?? null;
+    };
+    for (let k = 0; k < 60; k++) {
+      const hits = w.entities.filter((e) => busy(e) === want);
+      if (hits.length) {
+        const e = hits[0];
+        s.input2.selection.clear();
+        s.camModel.zoom = (78 * s.ctx.renderScale) / 64;
+        s.centerOnTile(e.x + 1.5, e.y - 0.3);
+        return `${want} x${hits.length} tick ${w.tick}`;
+      }
+      s.fastForward(20 * 10);
+    }
+    return `no ${want}`;
+  };
+  await page.evaluate(() => window.__godforge.game.scene.getScene('World').fastForward(20 * 60));
+  await shot('4-fishing', frame, 1600, 'fish');
+  await shot('4-chopping', frame, 1600, 'chop');
+  await shot('4-mining', frame, 1600, 'gold');
+  await shot('4-farming', frame, 1600, 'farm');
 }
 
 // ── Match 2: Aurelian League town ──

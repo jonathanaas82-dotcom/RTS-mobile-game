@@ -6,8 +6,11 @@ import type { MatchArt } from '../assets/matchArt';
 import { TILE_PX } from '../assets/tileset';
 import { ART_RES } from '../assets/procedural/draw';
 import { PALETTE } from '../assets/palette';
+import type { WorkAct } from '../assets/procedural/units';
 
 const TEAM = PALETTE.players.map((c) => parseInt(c.slice(1), 16));
+/** Buildings that send up hearth smoke. */
+const SMOKY = new Set(['house', 'town_hall', 'workshop']);
 
 const CARRY_COLORS: Record<string, number> = {
   food: 0xe04858,
@@ -18,6 +21,8 @@ const CARRY_COLORS: Record<string, number> = {
 
 interface View {
   sprite: Phaser.GameObjects.Image;
+  /** Last work key frame shown (to fire impact effects on the strike frame). */
+  workFrame: number;
   /** Foundation scaffold under buildings being constructed. */
   base: Phaser.GameObjects.Image | null;
   frameName: string;
@@ -36,6 +41,12 @@ export class EntityRenderer {
   private readonly rings: Phaser.GameObjects.Graphics;
   private readonly bars: Phaser.GameObjects.Graphics;
   private frameNo = 0;
+  /** Called when a worker's tool lands (wood chips, sparks, splashes...). */
+  onWorkImpact: ((act: WorkAct, x: number, y: number, facing: number) => void) | null = null;
+  /** Called when a fish leaps at a fishing spot (for the splash). */
+  onSplash: ((x: number, y: number) => void) | null = null;
+  /** Called now and then for inhabited buildings (chimney / smoke-hole puffs). */
+  onSmoke: ((x: number, y: number) => void) | null = null;
 
   constructor(scene: Phaser.Scene, art: MatchArt) {
     this.scene = scene;
@@ -82,19 +93,26 @@ export class EntityRenderer {
         this.hide(e.id);
         continue;
       }
-      const v = this.view(e);
+      const moving = e.x !== e.px || e.y !== e.py;
+      const step = Math.sin(time * 0.018 + e.id);
+      const anim = e.kind === 'unit' ? this.unitPose(world, e, moving, step, time) : null;
+      const v = this.view(e, anim?.name);
       v.seen = fn;
       const s = v.sprite;
       if (e.kind === 'unit') {
-        const moving = e.x !== e.px || e.y !== e.py;
-        const step = Math.sin(time * 0.018 + e.id);
+        const working = anim?.act != null;
+        if (working && anim.frame !== v.workFrame) {
+          if (anim.frame === 1) this.onWorkImpact?.(anim.act!, x, y, e.facing);
+          v.workFrame = anim.frame;
+        } else if (!working) v.workFrame = -1;
         const bob = moving ? -Math.abs(step) * 4 : 0;
         const sinceAttack = tick - e.lastAttack;
-        const lunge = sinceAttack >= 0 && sinceAttack < 3 ? e.facing * (3 - sinceAttack) * 3 : 0;
+        const lunge =
+          !working && sinceAttack >= 0 && sinceAttack < 3 ? e.facing * (3 - sinceAttack) * 3 : 0;
         s.setPosition(x + lunge, y + bob);
         s.setFlipX(e.facing < 0);
         // Walking sway and a forward lean while striking.
-        s.setAngle((moving ? step * 4 : 0) + (lunge !== 0 ? e.facing * 6 : 0));
+        s.setAngle((moving ? step * 3 : 0) + (lunge !== 0 ? e.facing * 6 : 0));
         s.setDepth(y);
         // Team-coloured footprint ring for readability in crowds.
         rings.fillStyle(TEAM[e.owner] ?? 0xffffff, 0.28);
@@ -113,7 +131,7 @@ export class EntityRenderer {
         }
         if (selected.has(e.id) || e.hp < e.maxHp)
           this.bar(bars, x, y - s.displayHeight * 0.85, e, 34);
-        if (e.carry > 0 && e.carryKind) {
+        if (e.carry > 0 && e.carryKind && !anim) {
           // Little bundle showing what a worker carries.
           const cy = y - s.displayHeight * 0.45;
           bars.fillStyle(CARRY_COLORS[e.carryKind] ?? 0xffffff, 1);
@@ -121,6 +139,12 @@ export class EntityRenderer {
           bars.lineStyle(1.5, 0x2b2116, 1);
           bars.strokeCircle(x - e.facing * 9, cy, 5);
         }
+      } else if (e.kind === 'resource' && e.def === 'fish') {
+        // Flat on the water: gently breathing ripples and the odd leaping fish.
+        s.setPosition(x, y);
+        s.setDepth(-1.2);
+        s.setScale((1 + 0.05 * Math.sin(time * 0.003 + e.id)) / ART_RES);
+        if (Math.random() < 0.006) this.leap(x, y);
       } else if (e.kind === 'resource') {
         s.setPosition(x, y);
         s.setDepth(y + (e.size * TILE_PX) / 4);
@@ -138,8 +162,14 @@ export class EntityRenderer {
           x - (e.size * TILE_PX) / 2,
           y - (e.size * TILE_PX) / 2 - BUILDING_OVERHANG * TILE_PX,
         );
-        s.setDepth(y + (e.size * TILE_PX) / 2 - 10);
+        // Fields are flat: keep them on the ground (under footprint rings and units).
+        s.setDepth(e.def === 'farm' ? -0.6 : y + (e.size * TILE_PX) / 2 - 10);
         if (e.kind === 'building') {
+          if (e.built && SMOKY.has(e.def) && Math.random() < 0.012)
+            this.onSmoke?.(
+              x + (e.size * TILE_PX) / 8,
+              y - (e.size * TILE_PX) / 2 - BUILDING_OVERHANG * TILE_PX * 0.55,
+            );
           if (!e.built) {
             // Rising construction: reveal the sprite from the bottom up.
             const h = s.height;
@@ -214,22 +244,106 @@ export class EntityRenderer {
     g.fillCircle(x0 - 3, y + h / 2, 3.5);
   }
 
+  /**
+   * Pick the animation frame for a unit: work key frames for gathering/building workers, carry
+   * poses on the way home, and alternating stride frames while walking.
+   */
+  private unitPose(
+    world: World,
+    e: Entity,
+    moving: boolean,
+    step: number,
+    time: number,
+  ): { name: string; act: WorkAct | null; frame: number } | null {
+    const base = `u:${e.def}:${e.owner}`;
+    if (!this.art.has(`${base}:walk`)) return null;
+    const pick = (suffix: string, act: WorkAct | null = null, frame = -1) => {
+      const name = `${base}:${suffix}`;
+      return this.art.has(name) ? { name, act, frame } : null;
+    };
+    const busy = world.tick - e.lastAttack < 16;
+    if (!moving && busy && (e.order.type === 'gather' || e.order.type === 'build')) {
+      let act: WorkAct = 'build';
+      if (e.order.type === 'gather') {
+        const t = world.byId.get(e.order.target);
+        if (e.order.tile >= 0) act = 'chop';
+        else if (t?.def === 'gold') act = 'mine';
+        else if (t?.def === 'fish') act = 'fish';
+        else if (t?.def === 'farm') act = 'farm';
+        else act = 'pick';
+      }
+      // Wind-up most of the cycle, then a quick strike (fishing: slow bob of the rod).
+      const period = act === 'fish' ? 1700 : act === 'pick' ? 900 : 760;
+      const phase = ((time + e.id * 137) % period) / period;
+      const frame = phase < (act === 'fish' ? 0.5 : 0.62) ? 0 : 1;
+      return pick(`${act}${frame}`, act, frame);
+    }
+    if (e.carry > 0 && e.carryKind) {
+      let art = e.carryKind === 'wood' ? 'wood' : e.carryKind === 'gold' ? 'gold' : 'berries';
+      if (e.carryKind === 'food') {
+        const t = world.byId.get(e.order.target);
+        if (t?.def === 'fish') art = 'fish';
+        else if (t?.def === 'farm') art = 'grain';
+      }
+      const r = pick(`carry_${art}${moving && step > 0 ? '_w' : ''}`);
+      if (r) return r;
+    }
+    if (moving && step > 0) return pick('walk');
+    return null;
+  }
+
+  /** A fish arcs out of the water and splashes back in. */
+  private leap(x: number, y: number): void {
+    const dir = Math.random() < 0.5 ? -1 : 1;
+    const img = this.scene.add
+      .image(x - dir * 10, y, 'fish_jump')
+      .setScale(0.5)
+      .setFlipX(dir < 0)
+      .setDepth(y + 2)
+      .setAngle(-dir * 40);
+    const st = { t: 0 };
+    this.scene.tweens.add({
+      targets: st,
+      t: 1,
+      duration: 650,
+      onUpdate: () => {
+        img.setPosition(x - dir * 10 + dir * 20 * st.t, y - Math.sin(st.t * Math.PI) * 22);
+        img.setAngle(dir * (-40 + 80 * st.t));
+      },
+      onComplete: () => {
+        img.destroy();
+        this.onSplash?.(x + dir * 10, y);
+      },
+    });
+  }
+
   private frameFor(e: Entity): string {
     if (e.kind === 'unit') return `u:${e.def}:${e.owner}`;
     if (e.kind === 'building') return `b:${e.def}:${e.owner}`;
     return e.def;
   }
 
-  private view(e: Entity): View {
-    const name = this.frameFor(e);
+  private view(e: Entity, pose?: string): View {
+    const name = pose ?? this.frameFor(e);
     let v = this.views.get(e.id);
     if (v && v.frameName === name) return v;
-    if (v) this.release(e.id, v);
+    const prevWork = v?.workFrame ?? -1;
+    if (v) {
+      // Same entity, new animation frame: just swap the texture frame on the sprite.
+      if (e.kind === 'unit' && !v.base) {
+        const [key, frame] = this.art.frame(name);
+        v.sprite.setTexture(key, frame);
+        v.frameName = name;
+        return v;
+      }
+      this.release(e.id, v);
+    }
     let sprite = this.pool.pop();
     if (e.kind === 'resource') {
-      const key = e.def === 'gold' ? 'gold_mine' : 'berry_bush';
+      const key = e.def === 'gold' ? 'gold_mine' : e.def === 'fish' ? 'fish_spot' : 'berry_bush';
       sprite = sprite ? sprite.setTexture(key) : this.scene.add.image(0, 0, key);
-      sprite.setOrigin(0.5, 0.5);
+      // The mine's rocks sit low in their canvas: lift them onto the footprint.
+      sprite.setOrigin(0.5, e.def === 'gold' ? 0.6 : 0.5);
     } else {
       const [key, frame] = this.art.frame(name);
       sprite = sprite ? sprite.setTexture(key, frame) : this.scene.add.image(0, 0, key, frame);
@@ -243,7 +357,7 @@ export class EntityRenderer {
       .setCrop()
       .setAngle(0)
       .setScale(1 / ART_RES);
-    v = { sprite, base: null, frameName: name, seen: 0 };
+    v = { sprite, base: null, frameName: name, seen: 0, workFrame: prevWork };
     this.views.set(e.id, v);
     return v;
   }

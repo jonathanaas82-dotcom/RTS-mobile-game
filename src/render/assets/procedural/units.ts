@@ -88,11 +88,35 @@ function oval(
   c.fill();
 }
 
+/** Work activities a worker can be drawn doing (two key frames each: 0 = wind-up, 1 = strike). */
+export type WorkAct = 'chop' | 'mine' | 'build' | 'farm' | 'pick' | 'fish';
+/** What a walking worker carries home. */
+export type CarryArt = 'wood' | 'gold' | 'berries' | 'fish' | 'grain';
+
+/** Animation pose for a humanoid. Omitted = the standing idle pose. */
+export interface Pose {
+  act?: WorkAct;
+  frame?: 0 | 1;
+  carry?: CarryArt;
+  /** Mid-stride legs (alternated with the standing pose while walking). */
+  stride?: boolean;
+}
+
+export const WORK_ACTS: readonly WorkAct[] = ['chop', 'mine', 'build', 'farm', 'pick', 'fish'];
+export const CARRY_ARTS: readonly CarryArt[] = ['wood', 'gold', 'berries', 'fish', 'grain'];
+
+/** Frame-name suffix of a pose (empty for idle). */
+export function poseName(p: Pose): string {
+  if (p.act) return `${p.act}${p.frame ?? 0}`;
+  if (p.carry) return `carry_${p.carry}${p.stride ? '_w' : ''}`;
+  return p.stride ? 'walk' : '';
+}
+
 /**
  * Draw a unit facing right on a transparent canvas: shaded figure with a dark outline and a soft
  * contact shadow. Anchor convention: feet at (0.5, 0.86) of the canvas.
  */
-export function drawUnit(def: UnitDef, team: string): HTMLCanvasElement {
+export function drawUnit(def: UnitDef, team: string, pose: Pose = {}): HTMLCanvasElement {
   const scale = def.art.scale ?? 1;
   const S = Math.round(BASE * scale);
   const [fig, c] = createCanvas(S, S);
@@ -100,7 +124,7 @@ export function drawUnit(def: UnitDef, team: string): HTMLCanvasElement {
   c.scale(S / 100, S / 100); // draw in a 100×100 design box
   switch (def.art.shape) {
     case 'humanoid':
-      humanoid(c, def, team, 50, 86, 1);
+      humanoid(c, def, team, 50, 86, 1, pose);
       break;
     case 'rider':
       rider(c, def, team);
@@ -127,6 +151,7 @@ export function drawUnit(def: UnitDef, team: string): HTMLCanvasElement {
   c.restore();
   const [out, oc] = createCanvas(S, S);
   const flying = def.art.shape === 'flyer';
+  if (pose.act === 'fish') fishingLine(oc, S, pose.frame ?? 0);
   softShadow(oc, S * 0.5, S * 0.87, S * (flying ? 0.2 : 0.27), S * 0.07, flying ? 0.25 : 0.4);
   oc.drawImage(outlined(fig, Math.max(2, S / 48)), 0, 0);
   return out;
@@ -324,7 +349,15 @@ function weapon(c: Ctx, def: UnitDef, hx: number, hy: number, s: (v: number) => 
 }
 
 /** Humanoid with feet at (fx, fy); `k` scales it (riders use a smaller one). */
-function humanoid(c: Ctx, def: UnitDef, team: string, fx: number, fy: number, k: number): void {
+function humanoid(
+  c: Ctx,
+  def: UnitDef,
+  team: string,
+  fx: number,
+  fy: number,
+  k: number,
+  pose: Pose = {},
+): void {
   const s = (v: number): number => v * k;
   const body = def.art.body;
   const f = def.faction;
@@ -344,19 +377,24 @@ function humanoid(c: Ctx, def: UnitDef, team: string, fx: number, fy: number, k:
   }
   // Back arm.
   line(c, fx - s(8), fy - s(44), fx - s(14), fy - s(26), s(6), shade(skin, 0.8));
-  // Legs with boots.
-  rr(c, fx - s(9), fy - s(24), s(7.5), s(20), s(3), vgrad(c, fy - s(24), fy - s(4), pants));
-  rr(
-    c,
-    fx + s(1.5),
-    fy - s(24),
-    s(7.5),
-    s(20),
-    s(3),
-    vgrad(c, fy - s(24), fy - s(4), shade(pants, 0.9)),
-  );
-  rr(c, fx - s(10), fy - s(7), s(9.5), s(7), s(2.5), LEATHER);
-  rr(c, fx + s(1), fy - s(7), s(10.5), s(7), s(2.5), shade(LEATHER, 0.85));
+  // Legs with boots (swung apart mid-stride).
+  if (pose.stride) {
+    leg(c, fx - s(3), fy - s(23), 0.38, s, pants);
+    leg(c, fx + s(3), fy - s(23), -0.32, s, shade(pants, 0.9));
+  } else {
+    rr(c, fx - s(9), fy - s(24), s(7.5), s(20), s(3), vgrad(c, fy - s(24), fy - s(4), pants));
+    rr(
+      c,
+      fx + s(1.5),
+      fy - s(24),
+      s(7.5),
+      s(20),
+      s(3),
+      vgrad(c, fy - s(24), fy - s(4), shade(pants, 0.9)),
+    );
+    rr(c, fx - s(10), fy - s(7), s(9.5), s(7), s(2.5), LEATHER);
+    rr(c, fx + s(1), fy - s(7), s(10.5), s(7), s(2.5), shade(LEATHER, 0.85));
+  }
   // Torso: armour/clothes with a team-coloured tabard and belt.
   const torsoColor = military && f === 'hrimfolk' ? mix(body, STEEL, 0.25) : body;
   c.fillStyle = vgrad(c, fy - s(52), fy - s(20), torsoColor);
@@ -391,7 +429,21 @@ function humanoid(c: Ctx, def: UnitDef, team: string, fx: number, fy: number, k:
       dgrad(c, fx - s(15), fy - s(50), fx - s(5), fy - s(42), f === 'aurelian' ? BRONZE : STEEL),
     );
   }
+  if (pose.carry === 'gold') sack(c, fx - s(12), fy - s(40), s);
+  if (pose.carry === 'wood') {
+    // Logs balanced across the shoulders, behind the head.
+    for (let i = 0; i < 3; i++) {
+      const ly = fy - s(55) + i * s(4.5);
+      const lx = fx - s(20) + (i % 2) * s(3);
+      rr(c, lx, ly, s(34), s(5.5), s(2.7), vgrad(c, ly, ly + s(5.5), '#8a6440'));
+      disc(c, lx + s(34), ly + s(2.75), s(2.7), '#d9b07a');
+    }
+  }
   head(c, def, fx, fy - s(60), s);
+  if (pose.act || pose.carry) {
+    workerArm(c, pose, fx, fy, s, skin);
+    return;
+  }
   // Front arm + hand holding the weapon.
   const hx = fx + s(14);
   const hy = fy - s(36);
@@ -435,6 +487,253 @@ function humanoid(c: Ctx, def: UnitDef, team: string, fx: number, fy: number, k:
         '#efe6cf',
       );
   }
+}
+
+/** A leg with its boot, pivoting at the hip by `ang` radians (positive = swung forward). */
+function leg(
+  c: Ctx,
+  x: number,
+  y: number,
+  ang: number,
+  s: (v: number) => number,
+  pants: string,
+): void {
+  c.save();
+  c.translate(x, y);
+  c.rotate(-ang);
+  rr(c, -s(3.75), 0, s(7.5), s(19), s(3), vgrad(c, 0, s(19), pants));
+  rr(c, -s(4.5), s(16), s(10), s(6.5), s(2.5), LEATHER);
+  c.restore();
+}
+
+/** Tool kinds drawn by `tool()`; the handle runs "up" from the hand before rotation. */
+type ToolKind = 'axe' | 'pick' | 'hammer' | 'hoe' | 'rod';
+
+/** Draw a tool gripped at (hx, hy), rotated `deg` degrees clockwise from pointing straight up. */
+function tool(
+  c: Ctx,
+  kind: ToolKind,
+  hx: number,
+  hy: number,
+  deg: number,
+  s: (v: number) => number,
+): void {
+  c.save();
+  c.translate(hx, hy);
+  c.rotate((deg * Math.PI) / 180);
+  const metal = (x0: number, y0: number, x1: number, y1: number): CanvasGradient =>
+    dgrad(c, x0, y0, x1, y1, STEEL);
+  switch (kind) {
+    case 'axe':
+      line(c, 0, s(6), 0, -s(28), s(3.2), WOOD);
+      c.fillStyle = metal(0, -s(34), s(14), -s(18));
+      c.beginPath();
+      c.moveTo(0, -s(28));
+      c.quadraticCurveTo(s(14), -s(34), s(12), -s(16));
+      c.quadraticCurveTo(s(7), -s(21), 0, -s(20));
+      c.closePath();
+      c.fill();
+      break;
+    case 'pick':
+      line(c, 0, s(6), 0, -s(28), s(3.2), WOOD);
+      c.strokeStyle = metal(-s(14), -s(30), s(14), -s(24));
+      c.lineWidth = s(3.6);
+      c.lineCap = 'round';
+      c.beginPath();
+      c.moveTo(-s(13), -s(20));
+      c.quadraticCurveTo(0, -s(33), s(14), -s(21));
+      c.stroke();
+      break;
+    case 'hammer':
+      line(c, 0, s(5), 0, -s(20), s(3), WOOD);
+      rr(c, -s(5), -s(27), s(12), s(8), s(1.5), metal(-s(5), -s(27), s(7), -s(19)));
+      break;
+    case 'hoe':
+      line(c, 0, s(10), 0, -s(36), s(3), WOOD);
+      c.fillStyle = metal(0, -s(40), s(10), -s(30));
+      c.beginPath();
+      c.moveTo(-s(1), -s(36));
+      c.lineTo(s(11), -s(33));
+      c.lineTo(s(10), -s(28));
+      c.lineTo(-s(1), -s(32));
+      c.closePath();
+      c.fill();
+      break;
+    case 'rod':
+      c.strokeStyle = WOOD;
+      c.lineWidth = s(2.2);
+      c.lineCap = 'round';
+      c.beginPath();
+      c.moveTo(0, s(6));
+      c.quadraticCurveTo(s(2), -s(18), s(4), -s(36));
+      c.stroke();
+      break;
+  }
+  c.restore();
+}
+
+/** Worker front arm for work and carry poses (and what the off hand holds). */
+function workerArm(
+  c: Ctx,
+  pose: Pose,
+  fx: number,
+  fy: number,
+  s: (v: number) => number,
+  skin: string,
+): void {
+  const shx = fx + s(8);
+  const shy = fy - s(46);
+  const arm = (dx: number, dy: number): [number, number] => {
+    const hx = shx + s(dx);
+    const hy = shy + s(dy);
+    line(c, shx, shy, hx, hy, s(6), shade(skin, 0.95));
+    return [hx, hy];
+  };
+  const hand = (hx: number, hy: number): void =>
+    disc(c, hx, hy, s(3.6), rgrad(c, hx, hy, s(3.6), skin));
+  const f = pose.frame ?? 0;
+  if (pose.act) {
+    switch (pose.act) {
+      case 'chop':
+      case 'mine': {
+        const kind = pose.act === 'chop' ? 'axe' : 'pick';
+        // Wind-up over the shoulder, then the swing lands in front.
+        const [hx, hy] = f === 0 ? arm(-2, -12) : arm(14, 5);
+        tool(c, kind, hx, hy, f === 0 ? -78 : pose.act === 'chop' ? 95 : 115, s);
+        hand(hx, hy);
+        break;
+      }
+      case 'build': {
+        const [hx, hy] = f === 0 ? arm(3, -15) : arm(14, 3);
+        tool(c, 'hammer', hx, hy, f === 0 ? -35 : 85, s);
+        hand(hx, hy);
+        break;
+      }
+      case 'farm': {
+        // Two-handed hoe: the back hand also grips the shaft.
+        const [hx, hy] = f === 0 ? arm(4, -8) : arm(13, 6);
+        tool(c, 'hoe', hx, hy, f === 0 ? -62 : 138, s);
+        hand(hx, hy);
+        break;
+      }
+      case 'pick': {
+        basket(c, fx + s(13), fy - s(25), s, 'berries');
+        if (f === 0) {
+          const [hx, hy] = arm(15, -8);
+          hand(hx, hy);
+          disc(c, hx + s(3), hy - s(3), s(2.4), '#d8304a');
+        } else {
+          const [hx, hy] = arm(6, 12);
+          hand(hx, hy);
+        }
+        break;
+      }
+      case 'fish': {
+        const [hx, hy] = arm(11, 1);
+        tool(c, 'rod', hx, hy, f === 0 ? ROD_DEG[0] : ROD_DEG[1], s);
+        hand(hx, hy);
+        break;
+      }
+    }
+    return;
+  }
+  switch (pose.carry) {
+    case 'wood': {
+      const [hx, hy] = arm(4, -6);
+      hand(hx, hy);
+      break;
+    }
+    case 'gold': {
+      const [hx, hy] = arm(5, 10);
+      hand(hx, hy);
+      break;
+    }
+    case 'berries':
+    case 'grain': {
+      basket(c, fx + s(14), fy - s(30), s, pose.carry);
+      const [hx, hy] = arm(8, 14);
+      hand(hx, hy);
+      break;
+    }
+    case 'fish': {
+      const [hx, hy] = arm(9, 12);
+      line(c, hx, hy, hx + s(1), hy + s(6), s(1.2), '#d8c385');
+      for (let i = 0; i < 2; i++) {
+        const cx = hx + s(1) + i * s(3);
+        const cy = hy + s(13) + i * s(2);
+        oval(c, cx, cy, s(2.6), s(7), vgrad(c, cy - s(7), cy + s(7), '#9fb8c8'));
+        c.fillStyle = '#7d96a8';
+        c.beginPath();
+        c.moveTo(cx, cy + s(6));
+        c.lineTo(cx - s(3), cy + s(10));
+        c.lineTo(cx + s(3), cy + s(10));
+        c.closePath();
+        c.fill();
+      }
+      hand(hx, hy);
+      break;
+    }
+  }
+}
+
+/** Woven basket with its contents peeking out. */
+function basket(
+  c: Ctx,
+  x: number,
+  y: number,
+  s: (v: number) => number,
+  contents: 'berries' | 'grain',
+): void {
+  if (contents === 'berries') {
+    for (let i = 0; i < 5; i++)
+      disc(c, x - s(5) + i * s(2.5), y - s(3) - (i % 2) * s(1.5), s(2.4), '#d8304a');
+  } else {
+    for (let i = 0; i < 5; i++)
+      line(c, x - s(4) + i * s(2), y, x - s(6) + i * s(3), y - s(11), s(1.4), '#e2c060');
+  }
+  c.fillStyle = vgrad(c, y - s(2), y + s(9), '#b08548');
+  c.beginPath();
+  c.moveTo(x - s(8), y - s(2));
+  c.lineTo(x + s(8), y - s(2));
+  c.lineTo(x + s(6), y + s(8));
+  c.lineTo(x - s(6), y + s(8));
+  c.closePath();
+  c.fill();
+  for (let i = 0; i < 3; i++)
+    line(c, x - s(7), y + i * s(3), x + s(7), y + i * s(3), s(0.8), '#7a5634');
+}
+
+/** Bulging ore sack slung on the back, nuggets glinting at the mouth. */
+function sack(c: Ctx, x: number, y: number, s: (v: number) => number): void {
+  oval(c, x, y + s(4), s(8), s(10), vgrad(c, y - s(6), y + s(14), '#a08060'));
+  disc(c, x - s(2), y - s(6), s(2.6), rgrad(c, x - s(2), y - s(6), s(2.6), GOLD));
+  disc(c, x + s(2.5), y - s(5), s(2.2), rgrad(c, x + s(2.5), y - s(5), s(2.2), GOLD));
+}
+
+const ROD_DEG = [35, 46] as const;
+
+/** Fishing line from the rod tip down to a bobber in the water at the right edge. */
+function fishingLine(c: Ctx, S: number, frame: 0 | 1): void {
+  const k = S / 100;
+  // Rod tip: hand at (69, 41) in the design box, tip at local (4, -36) rotated by ROD_DEG.
+  const a = (ROD_DEG[frame] * Math.PI) / 180;
+  const tip = [69 + 4 * Math.cos(a) + 36 * Math.sin(a), 41 + 4 * Math.sin(a) - 36 * Math.cos(a)];
+  const bob = frame === 0 ? [97, 90] : [97, 93];
+  c.save();
+  c.scale(k, k);
+  c.strokeStyle = 'rgba(240,240,230,0.85)';
+  c.lineWidth = 0.7;
+  c.beginPath();
+  c.moveTo(tip[0]!, tip[1]!);
+  c.quadraticCurveTo(tip[0]! + 2, (tip[1]! + bob[1]!) / 2 + 8, bob[0]!, bob[1]!);
+  c.stroke();
+  disc(c, bob[0]!, bob[1]! - 1, 1.8, '#e04030');
+  c.strokeStyle = 'rgba(255,255,255,0.7)';
+  c.lineWidth = 0.6;
+  c.beginPath();
+  c.ellipse(bob[0]!, bob[1]! + 0.5, frame === 0 ? 3 : 5, frame === 0 ? 1 : 1.6, 0, 0, Math.PI * 2);
+  c.stroke();
+  c.restore();
 }
 
 // ───────────────────────── riders & engines ─────────────────────────

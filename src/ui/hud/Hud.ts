@@ -433,7 +433,8 @@ function renderButtons(
   const keep = new Set<HTMLButtonElement>();
   let prev: HTMLElement | null = null;
   for (const s of specs) {
-    const sig = [s.label, s.sub, s.disabled, s.active, s.badge, s.icon, s.svg].join('|');
+    const cost = s.cost ? costChips(s.cost) : '';
+    const sig = [s.label, s.sub, cost, s.disabled, s.active, s.badge, s.icon, s.svg].join('|');
     let b = existing.get(s.id);
     if (!b || b.dataset.sig !== sig) {
       b?.remove();
@@ -450,7 +451,11 @@ function renderButtons(
         (s.icon
           ? `<img alt="" src="${s.icon}">`
           : (s.svg ?? `<span class="btn-label">${escapeHtml(s.label)}</span>`)) +
-        (s.sub ? `<span class="btn-sub">${escapeHtml(s.sub)}</span>` : '') +
+        (cost
+          ? `<span class="btn-cost">${cost}</span>`
+          : s.sub
+            ? `<span class="btn-sub">${escapeHtml(s.sub)}</span>`
+            : '') +
         (s.badge ? `<span class="badge">${escapeHtml(s.badge)}</span>` : '') +
         '<span class="btn-progress"></span>';
       const btn = b;
@@ -489,6 +494,15 @@ function renderButtons(
     keep.add(b);
   }
   for (const b of existing.values()) if (!keep.has(b)) b.remove();
+}
+
+const COST_ORDER: ResourceKind[] = ['food', 'wood', 'gold', 'favor'];
+
+/** Compact price: a coloured resource dot before each amount. */
+function costChips(cost: Partial<Record<ResourceKind, number>>): string {
+  return COST_ORDER.filter((k) => cost[k])
+    .map((k) => `<span class="chip"><i class="dot dot-${k}"></i>${cost[k]}</span>`)
+    .join('');
 }
 
 function escapeHtml(s: string): string {

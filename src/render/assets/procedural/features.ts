@@ -167,3 +167,74 @@ export function generateGlint(): HTMLCanvasElement {
   c.fill();
   return cv;
 }
+
+/** Fishing spot (1×1 water tile): fish silhouettes under concentric ripples. No outline. */
+export function generateFishSpot(): HTMLCanvasElement {
+  const s = TILE_PX;
+  const [cv, c] = createCanvas(s * ART_RES, s * ART_RES);
+  c.scale(ART_RES, ART_RES);
+  const fish = (x: number, y: number, ang: number, len: number): void => {
+    c.save();
+    c.translate(x, y);
+    c.rotate(ang);
+    c.fillStyle = 'rgba(10,32,48,0.55)';
+    c.beginPath();
+    c.ellipse(0, 0, len, len * 0.32, 0, 0, Math.PI * 2);
+    c.fill();
+    c.beginPath();
+    c.moveTo(-len * 0.9, 0);
+    c.lineTo(-len * 1.45, -len * 0.38);
+    c.lineTo(-len * 1.45, len * 0.38);
+    c.closePath();
+    c.fill();
+    c.restore();
+  };
+  fish(s * 0.36, s * 0.42, 0.4, 7);
+  fish(s * 0.64, s * 0.56, -2.6, 6);
+  fish(s * 0.46, s * 0.68, 0.1, 5);
+  c.strokeStyle = 'rgba(235,248,255,0.55)';
+  for (const [r, a] of [
+    [9, 0.6],
+    [17, 0.4],
+    [25, 0.22],
+  ] as const) {
+    c.globalAlpha = a;
+    c.lineWidth = 1.6;
+    c.beginPath();
+    c.ellipse(s / 2, s / 2, r, r * 0.55, 0, 0, Math.PI * 2);
+    c.stroke();
+  }
+  c.globalAlpha = 1;
+  for (const [x, y, r] of [
+    [0.3, 0.3, 1.6],
+    [0.7, 0.36, 1.2],
+    [0.58, 0.28, 1],
+  ] as const)
+    disc(c, s * x, s * y, r, 'rgba(255,255,255,0.75)');
+  return cv;
+}
+
+/** A small leaping fish (used for the occasional splash at fishing spots). */
+export function generateFishJump(): HTMLCanvasElement {
+  const s = 24;
+  const [cv, c] = createCanvas(s * ART_RES, s * ART_RES);
+  c.scale(ART_RES, ART_RES);
+  const g = c.createLinearGradient(0, 6, 0, 18);
+  g.addColorStop(0, '#d6e6ef');
+  g.addColorStop(1, '#6f8ea4');
+  c.fillStyle = g;
+  c.strokeStyle = '#22323e';
+  c.lineWidth = 1.2;
+  c.beginPath();
+  c.moveTo(4, 14);
+  c.quadraticCurveTo(12, 4, 20, 10);
+  c.quadraticCurveTo(13, 16, 4, 14);
+  c.moveTo(4, 14);
+  c.lineTo(1, 9);
+  c.lineTo(1, 18);
+  c.closePath();
+  c.fill();
+  c.stroke();
+  disc(c, 17, 10, 1, '#111');
+  return cv;
+}

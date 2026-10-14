@@ -1,3 +1,5 @@
+import type { ResourceKind } from '../../data/balance/economy';
+
 /** Data the game feeds to the DOM HUD. The HUD renders these generically. */
 export interface ButtonSpec {
   /** Stable key; also used for change detection. */
@@ -6,8 +8,10 @@ export interface ButtonSpec {
   icon?: string;
   svg?: string;
   label: string;
-  /** Second line, e.g. cost. */
+  /** Second line, e.g. a cooldown. */
   sub?: string;
+  /** Price, rendered as coloured resource chips (replaces `sub`). */
+  cost?: Partial<Record<ResourceKind, number>>;
   disabled?: boolean;
   active?: boolean;
   badge?: string;

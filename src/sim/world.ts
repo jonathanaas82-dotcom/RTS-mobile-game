@@ -4,7 +4,7 @@ import type { FactionId, UnitClass } from '../data/types';
 import { Rng } from './core/rng';
 import { createEntity, type Entity } from './entity';
 import { Grid } from './grid';
-import { generateMap, type GameMap } from './map/mapgen';
+import { featureSize, generateMap, type GameMap } from './map/mapgen';
 import { Pathfinder } from './path/astar';
 import { createPlayer, modified, type PlayerState } from './player';
 import { SpatialHash } from './spatial';
@@ -135,7 +135,7 @@ export function createWorld(config: MatchConfig): World {
     const e = addEntity(world, 'resource', f.kind, -1);
     e.tileX = f.x;
     e.tileY = f.y;
-    e.size = f.kind === 'gold' ? 2 : 1;
+    e.size = featureSize(f.kind);
     e.x = f.x + e.size / 2;
     e.y = f.y + e.size / 2;
     e.amount = f.amount;

@@ -92,6 +92,9 @@ export class WorldScene extends Phaser.Scene {
     this.buildTerrain();
     this.entities = new EntityRenderer(this, this.art);
     this.fx = new EffectsRenderer(this, this.art);
+    this.entities.onWorkImpact = (act, x, y, facing) => this.fx.workImpact(act, x, y, facing);
+    this.entities.onSplash = (x, y) => this.fx.splash(x, y);
+    this.entities.onSmoke = (x, y) => this.fx.smoke(x, y);
     this.fx.particles = this.ctx.settings.graphics !== 'low';
     this.fogR = new FogRenderer(this, this.world);
     this.ambience = new Ambience(this, this.world, this.ctx.settings.graphics);

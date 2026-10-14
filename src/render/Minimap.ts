@@ -130,7 +130,7 @@ export class Minimap {
         if (e.kind !== 'unit' && f === 0) continue;
       }
       if (e.kind === 'resource') {
-        c.fillStyle = e.def === 'gold' ? '#ffd84a' : '#ff6b7a';
+        c.fillStyle = e.def === 'gold' ? '#ffd84a' : e.def === 'fish' ? '#bfe8ff' : '#ff6b7a';
         c.fillRect(e.tileX * sx, e.tileY * sy, e.size * sx, e.size * sy);
       } else if (e.kind === 'building') {
         c.fillStyle = PALETTE.players[e.owner] ?? '#fff';

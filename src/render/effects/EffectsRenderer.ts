@@ -1,5 +1,6 @@
 import type Phaser from 'phaser';
 import type { SimEvent, World } from '../../sim/world';
+import type { WorkAct } from '../assets/procedural/units';
 import type { MatchArt } from '../assets/matchArt';
 import { TILE_PX } from '../assets/tileset';
 
@@ -85,11 +86,80 @@ export class EffectsRenderer {
         blendMode: 'ADD',
       })
       .setDepth(4.3e5);
+    this.smokeFx = scene.add
+      .particles(0, 0, 'soft', {
+        emitting: false,
+        speedX: { min: 4, max: 14 },
+        speedY: { min: -26, max: -16 },
+        lifespan: { min: 2600, max: 3600 },
+        scale: { start: 0.12, end: 0.55 },
+        alpha: { start: 0.45, end: 0 },
+        tint: 0xd8d2cc,
+      })
+      .setDepth(4.05e5);
+    this.chips = scene.add
+      .particles(0, 0, 'spark', {
+        emitting: false,
+        speed: { min: 50, max: 120 },
+        angle: { min: 200, max: 340 },
+        lifespan: { min: 300, max: 520 },
+        scale: { start: 0.22, end: 0.1 },
+        gravityY: 420,
+      })
+      .setDepth(4.15e5);
   }
 
   private readonly sparks: Phaser.GameObjects.Particles.ParticleEmitter;
   private readonly dust: Phaser.GameObjects.Particles.ParticleEmitter;
   private readonly magic: Phaser.GameObjects.Particles.ParticleEmitter;
+  private readonly smokeFx: Phaser.GameObjects.Particles.ParticleEmitter;
+  /** Small debris thrown up and falling back (wood chips, soil, water droplets). */
+  private readonly chips: Phaser.GameObjects.Particles.ParticleEmitter;
+
+  /** A worker's tool lands: debris matching the work, thrown from in front of them. */
+  workImpact(act: WorkAct, x: number, y: number, facing: number): void {
+    if (!this.particles) return;
+    const ix = x + facing * 20;
+    const iy = y - 10;
+    switch (act) {
+      case 'chop':
+        this.chips.setParticleTint(0xd9b07a);
+        this.chips.explode(4, ix, iy - 8);
+        break;
+      case 'mine':
+        this.sparks.explode(3, ix, iy - 2);
+        this.chips.setParticleTint(0x8a8378);
+        this.chips.explode(2, ix, iy);
+        break;
+      case 'farm':
+        this.chips.setParticleTint(0x6b4a2e);
+        this.chips.explode(4, ix + facing * 8, y - 2);
+        break;
+      case 'build':
+        this.dust.explode(2, ix, iy);
+        this.chips.setParticleTint(0xc8a070);
+        this.chips.explode(2, ix, iy - 6);
+        break;
+      case 'fish':
+        this.splash(x + facing * 30, y + 4, 3);
+        break;
+      case 'pick':
+        break;
+    }
+  }
+
+  /** A slow, drifting puff of hearth smoke. */
+  smoke(x: number, y: number): void {
+    if (!this.particles) return;
+    this.smokeFx.explode(1, x, y);
+  }
+
+  /** Water droplets (fish leaps, fishing bobber). */
+  splash(x: number, y: number, count = 6): void {
+    if (!this.particles) return;
+    this.chips.setParticleTint(0xdff2ff);
+    this.chips.explode(count, x, y);
+  }
 
   /** Rising coloured motes (heal, magic, building completion). */
   motes(x: number, y: number, color: number, count = 14): void {

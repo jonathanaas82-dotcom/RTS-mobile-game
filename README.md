@@ -45,6 +45,7 @@ or `?tutorial=1`. Without parameters the game opens on the main menu.
 | Pinch                           | Zoom                                                           |
 | Tap own unit/building           | Select it                                                      |
 | Tap ground / enemy / resource   | Move / attack / gather with the selection                      |
+| Tap a fishing spot (ripples)    | Workers fish from the shore (food)                             |
 | Tap own unfinished building     | Selected workers help build or repair                          |
 | Tap ground with a building sel. | Set its rally point (rally on a resource = new workers gather) |
 | Double-tap a unit               | Select all units of that type on screen                        |

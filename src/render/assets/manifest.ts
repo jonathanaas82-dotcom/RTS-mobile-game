@@ -1,5 +1,7 @@
 import {
   generateBerryBush,
+  generateFishJump,
+  generateFishSpot,
   generateGlint,
   generateGoldMine,
   generateRing,
@@ -21,6 +23,8 @@ export type AssetEntry =
 export const ASSETS: readonly AssetEntry[] = [
   { key: 'gold_mine', generate: generateGoldMine },
   { key: 'berry_bush', generate: generateBerryBush },
+  { key: 'fish_spot', generate: generateFishSpot },
+  { key: 'fish_jump', generate: generateFishJump },
   { key: 'ring', generate: generateRing },
   { key: 'spark', generate: generateSpark },
   { key: 'soft', generate: generateSoft },

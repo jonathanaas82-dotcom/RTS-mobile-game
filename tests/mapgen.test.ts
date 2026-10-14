@@ -59,6 +59,7 @@ describe('generateMap', () => {
       const m = generateMap(64, seed);
       const occ = new Set<number>();
       for (const f of m.features) {
+        if (f.kind === 'fish') continue;
         const s = featureSize(f.kind);
         for (let dy = 0; dy < s; dy++)
           for (let dx = 0; dx < s; dx++) {
@@ -69,6 +70,27 @@ describe('generateMap', () => {
           }
       }
     }
+  });
+
+  it('places mirrored fishing spots on water next to reachable shore', () => {
+    let total = 0;
+    for (const seed of SEEDS) {
+      const m = generateMap(64, seed);
+      const reach = floodReachable(m, m.starts[0]!);
+      for (const f of m.features) {
+        if (f.kind !== 'fish') continue;
+        total++;
+        expect(m.tiles[f.y * m.width + f.x]).toBe(Terrain.Water);
+        const shore = [
+          [1, 0],
+          [-1, 0],
+          [0, 1],
+          [0, -1],
+        ].some(([dx, dy]) => reach[(f.y + dy!) * m.width + f.x + dx!]);
+        expect(shore).toBe(true);
+      }
+    }
+    expect(total).toBeGreaterThan(SEEDS.length * 2);
   });
 
   it('assigns wood only to forest tiles', () => {

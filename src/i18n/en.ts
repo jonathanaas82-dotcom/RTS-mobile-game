@@ -185,6 +185,7 @@ export const en = {
   'terrain.4': 'Cliff',
   'feature.gold': 'Gold mine ({amount})',
   'feature.berries': 'Berry bush ({amount})',
+  'feature.fish': 'Fishing spot ({amount})',
 } as const;
 
 export type TranslationKey = keyof typeof en;

@@ -8,9 +8,12 @@ export interface TilePoint {
   y: number;
 }
 
-export type FeatureKind = 'gold' | 'berries';
+export type FeatureKind = 'gold' | 'berries' | 'fish';
 
-/** A static resource on the map. Gold mines occupy 2x2 tiles (x, y = top-left); berries 1x1. */
+/**
+ * A static resource on the map. Gold mines occupy 2x2 tiles (x, y = top-left); berries 1x1 on
+ * land; fish 1x1 on a shoreline water tile (gathered from the adjacent shore).
+ */
 export interface MapFeature {
   kind: FeatureKind;
   x: number;
@@ -141,7 +144,68 @@ export function generateMap(size: number, seed: number): GameMap {
   for (let i = 0; i < total; i++) {
     if (tiles[i] === Terrain.Forest) map.wood[i] = MAPGEN.woodPerTree;
   }
+
+  // 6. Fishing spots on reachable shorelines (last, so earlier generation is unaffected).
+  placeFish(map, rng);
   return map;
+}
+
+/**
+ * Fish shoals sit on water tiles next to reachable shore: one near each base when there is water
+ * close by, plus a few extras. Mirrored like everything else.
+ */
+function placeFish(map: GameMap, rng: Rng): void {
+  const w = map.width;
+  const total = w * map.height;
+  const [s0] = map.starts as [TilePoint, TilePoint];
+  const reach = floodReachable(map, s0);
+  const candidates: TilePoint[] = [];
+  for (let i = 0; i < total; i++) {
+    if (i > total - 1 - i) break; // canonical half
+    if (map.tiles[i] !== Terrain.Water) continue;
+    const x = i % w;
+    const y = (i - x) / w;
+    let shore = 0;
+    let water = 0;
+    for (const [dx, dy] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ] as const) {
+      if (!inBounds(map, x + dx, y + dy)) continue;
+      const j = (y + dy) * w + x + dx;
+      if (reach[j]) shore++;
+      else if (map.tiles[j] === Terrain.Water) water++;
+    }
+    if (shore > 0 && water >= 2) candidates.push({ x, y });
+  }
+  const spacing2 = MAPGEN.fishSpacing ** 2;
+  const fishes: TilePoint[] = [];
+  const add = (c: TilePoint): void => {
+    const m = mirror(map, c);
+    if (dist2(m, c) < spacing2) return;
+    fishes.push(c, m);
+    map.features.push({ kind: 'fish', x: c.x, y: c.y, amount: MAPGEN.foodPerFish });
+    map.features.push({ kind: 'fish', x: m.x, y: m.y, amount: MAPGEN.foodPerFish });
+  };
+  const free = (c: TilePoint): boolean => !fishes.some((f) => dist2(f, c) < spacing2);
+  // Home spot: closest candidate to the first start (its mirror serves the second start).
+  let best: TilePoint | null = null;
+  let bestD = MAPGEN.homeFishDistance ** 2;
+  for (const c of candidates) {
+    const d = dist2(c, s0);
+    if (d < bestD) {
+      bestD = d;
+      best = c;
+    }
+  }
+  if (best) add(best);
+  for (let k = 0; k < 60 && fishes.length < 2 + MAPGEN.extraFishSpots * 2; k++) {
+    if (candidates.length === 0) break;
+    const c = candidates[rng.int(0, candidates.length - 1)] as TilePoint;
+    if (free(c)) add(c);
+  }
 }
 
 /**

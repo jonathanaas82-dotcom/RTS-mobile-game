@@ -102,7 +102,8 @@ export class CommandCard {
 
   private single(e: Entity, world: World, lang: string, onDeselect: () => void): SelectionView {
     if (e.kind === 'resource') {
-      const key: TranslationKey = e.def === 'gold' ? 'feature.gold' : 'feature.berries';
+      const key: TranslationKey =
+        e.def === 'gold' ? 'feature.gold' : e.def === 'fish' ? 'feature.fish' : 'feature.berries';
       return { title: t(key, { amount: Math.floor(e.amount) }), icon: undefined, onDeselect };
     }
     if (e.kind === 'building') {
@@ -197,7 +198,7 @@ export class CommandCard {
             id: `build:${b.id}`,
             icon: this.host.icon(`b:${b.id}:${me}`),
             label: loc(b.name, lang),
-            sub: costText(cost),
+            cost,
             disabled: !chk.ok,
             hint: `${loc(b.name, lang)} — ${costText(cost)}${chk.ok ? '' : ` · ${denialText(chk)}`}${chk.reason === 'age' ? ` (${loc(AGES[b.age]!.name, lang)})` : ''}`,
             onPress: () => {
@@ -287,7 +288,7 @@ export class CommandCard {
         id: `train:${u.id}`,
         icon: this.host.icon(`u:${u.id}:${me}`),
         label: loc(u.name, lang),
-        sub: costText(cost),
+        cost,
         badge: queued > 0 ? String(queued) : undefined,
         progress:
           head && head.kind === 'unit' && head.id === u.id
@@ -310,7 +311,8 @@ export class CommandCard {
       out.push({
         id: `tech:${tech.id}`,
         label: loc(tech.name, lang),
-        sub: costText(tech.cost),
+        icon: techIcon(tech.effects[0]?.stat ?? ''),
+        cost: tech.cost,
         disabled: !chk.ok,
         progress:
           head && head.kind === 'tech' && head.id === tech.id
@@ -331,7 +333,7 @@ export class CommandCard {
           id: 'age',
           svg: ICONS.age,
           label: ageName,
-          sub: costText(info.cost),
+          cost: info.cost,
           disabled: !chk.ok,
           progress: head && head.kind === 'age' ? head.progress / Math.max(1, head.total) : 0,
           hint: `${t('cmd.advance', { age: ageName })} — ${costText(info.cost)}${chk.ok ? '' : ` · ${denialText(chk)}`}`,
@@ -387,6 +389,33 @@ const GLYPH: Record<PowerKind, string> = {
   boost: 'M12 3l7 8h-4v9H9v-9H5z',
   reveal: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zm10-3a3 3 0 1 0 0 6 3 3 0 0 0 0-6z',
 };
+
+const techIcons = new Map<string, string>();
+/** Glyphs for tech icons by the stat they improve (24×24 paths, drawn dark on parchment). */
+const TECH_GLYPH: Record<string, string> = {
+  gather: 'M6 20c6 0 11-5 11-12l-3 1c0 5-3 8-8 8zM14 4l5 5 2-2-5-5z',
+  damage: 'M5 19l2 0 9-9 1-5-5 1-9 9 0 2-2 2 2 2zM14 8l2 2',
+  hp: 'M12 3l8 3v6c0 5-4 8-8 9-4-1-8-4-8-9V6zM12 8v8M8 12h8',
+  armor: 'M12 3l8 3v6c0 5-4 8-8 9-4-1-8-4-8-9V6z',
+  speed: 'M3 15c4 0 7-2 9-6l3 2c-2 5-6 7-12 7zM14 6l6-2-2 6z',
+  range: 'M5 4c8 2 13 7 15 15M5 4l14 15M4 12l3-1 1-3',
+  favor: 'M12 2l2.6 6.4L21 9l-5 4.3L17.5 20 12 16.6 6.5 20 8 13.3 3 9l6.4-.6z',
+  '': 'M6 3h10l3 3v15H6zM9 9h7M9 13h7M9 17h5',
+};
+
+/** Parchment medallion icon for a technology. */
+export function techIcon(stat: string): string {
+  let url = techIcons.get(stat);
+  if (url) return url;
+  const glyph = TECH_GLYPH[stat] ?? TECH_GLYPH['']!;
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><defs><radialGradient id="g" cx=".4" cy=".35" r=".7"><stop offset="0" stop-color="#fff4d6"/><stop offset="1" stop-color="#c9a86a"/></radialGradient></defs>` +
+    `<circle cx="12" cy="12" r="11" fill="url(#g)" stroke="#5a4320" stroke-width="1.2"/><circle cx="12" cy="12" r="9" fill="none" stroke="#a07c3a" stroke-width=".6"/>` +
+    `<path d="${glyph}" fill="#4a3518" fill-opacity=".85" stroke="#2b2116" stroke-width=".6" stroke-linejoin="round" transform="translate(4.2 4.2) scale(.65)"/></svg>`;
+  url = `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+  techIcons.set(stat, url);
+  return url;
+}
 
 /** Simple generated icon for a god power (coloured disc + glyph by kind). */
 export function powerIcon(kind: PowerKind, color: string): string {

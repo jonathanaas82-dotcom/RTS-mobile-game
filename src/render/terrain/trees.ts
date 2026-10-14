@@ -87,7 +87,7 @@ function pine(c: Ctx, seed: number, leaf: string): void {
   }
 }
 
-function treeCanvas(kind: 'broad' | 'pine', seed: number, leaf: string): HTMLCanvasElement {
+export function treeCanvas(kind: 'broad' | 'pine', seed: number, leaf: string): HTMLCanvasElement {
   const [fig, c] = createCanvas(TREE_W * ART_RES, TREE_H * ART_RES);
   c.scale(ART_RES, ART_RES);
   if (kind === 'broad') broadleaf(c, seed, leaf);

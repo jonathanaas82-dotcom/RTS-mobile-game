@@ -1,12 +1,15 @@
 import { GAME_NAME, GAME_VERSION } from '../../config/game';
-import { FACTIONS, factionDef, godDef, loc, powerDef } from '../../data';
+import { FACTIONS, UNITS, factionDef, godDef, loc, powerDef } from '../../data';
 import { AI_PROFILES } from '../../data/ai';
 import { MAP_SIZES, type MapSizeKey } from '../../data/balance/map';
 import type { FactionId } from '../../data/types';
 import { getLanguage, setLanguage, t, type Language } from '../../i18n';
 import { hashSeed } from '../../sim/core/rng';
 import type { Difficulty, MatchConfig } from '../../sim/world';
+import { drawUnit } from '../../render/assets/procedural/units';
+import { powerIcon } from '../commandCard';
 import { el, onPress } from '../hud/dom';
+import { menuBackdrop } from './backdrop';
 import { saveSettings, type GraphicsQuality, type Settings } from '../settings';
 import { loadStats, saveStats } from '../stats';
 
@@ -26,6 +29,31 @@ interface PreMatch {
 }
 
 const EMBLEM = `<svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="eg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe58a"/><stop offset="1" stop-color="#b48a2c"/></linearGradient></defs><path d="M14 40h36c-2 6-8 8-13 9v5h6v5H21v-5h6v-5c-5-1-12-4-13-9z" fill="#6f665c"/><path d="M36 6L22 30h10l-6 16 18-24H34l6-16z" fill="url(#eg)" stroke="#6d4f12" stroke-width="1.5"/></svg>`;
+
+/** Small inline icons for the main menu buttons. */
+const MENU_ICONS = {
+  skirmish: '<svg viewBox="0 0 24 24"><path d="M5 19L17 4l2 1-11 15zM19 19L7 4 5 5l11 15z"/></svg>',
+  tutorial:
+    '<svg viewBox="0 0 24 24"><path d="M4 5c3-1 6-1 8 1 2-2 5-2 8-1v14c-3-1-6-1-8 1-2-2-5-2-8-1z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 6v14" stroke="currentColor" stroke-width="2"/></svg>',
+  settings:
+    '<svg viewBox="0 0 24 24"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm8.5 4l2-1.5-2-3.5-2.4.8a8 8 0 0 0-1.7-1L16 4h-4l-.4 2.8a8 8 0 0 0-1.7 1L7.5 7 5.5 10.5 7.5 12l-2 1.5 2 3.5 2.4-.8a8 8 0 0 0 1.7 1L12 20h4l.4-2.8a8 8 0 0 0 1.7-1l2.4.8 2-3.5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>',
+  stats:
+    '<svg viewBox="0 0 24 24"><path d="M5 20V10M12 20V4M19 20v-7" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>',
+  credits:
+    '<svg viewBox="0 0 24 24"><path d="M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6L3.3 9.3l6.1-.7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
+};
+
+const portraits = new Map<string, string>();
+/** Data-URL portrait of a faction's hero (for the faction cards). */
+function factionPortrait(id: FactionId): string {
+  let url = portraits.get(id);
+  if (!url) {
+    const hero = UNITS.find((u) => u.faction === id && u.cls === 'hero') ?? UNITS[0]!;
+    url = drawUnit(hero, '#c9a24a').toDataURL();
+    portraits.set(id, url);
+  }
+  return url;
+}
 
 /** Full-screen DOM menus: main menu, pre-match setup, settings, statistics, credits. */
 export class Menus {
@@ -56,6 +84,16 @@ export class Menus {
   private screen(cls: string): HTMLElement {
     this.root.hidden = false;
     this.root.innerHTML = '';
+    this.root.style.setProperty('--backdrop', `url(${menuBackdrop()})`);
+    // Drifting embers over the backdrop (pure decoration).
+    const embers = el('div', 'embers', this.root);
+    embers.setAttribute('aria-hidden', 'true');
+    for (let i = 0; i < 16; i++) {
+      const e = el('i', '', embers);
+      e.style.left = `${(i * 61) % 100}%`;
+      e.style.animationDelay = `${-((i * 1.7) % 9)}s`;
+      e.style.animationDuration = `${7 + ((i * 3) % 6)}s`;
+    }
     const s = el('div', `menu-screen ${cls}`, this.root);
     s.dataset.scroll = '1';
     return s;
@@ -66,10 +104,14 @@ export class Menus {
     label: string,
     onTap: () => void,
     cls = 'menu-btn',
+    icon?: string,
   ): HTMLButtonElement {
     const b = el('button', cls, parent);
     b.type = 'button';
-    b.textContent = label;
+    if (icon) {
+      el('span', 'btn-icon', b).innerHTML = icon;
+      el('span', 'btn-text', b).textContent = label;
+    } else b.textContent = label;
     onPress(b, () => {
       this.cb.click();
       onTap();
@@ -91,17 +133,43 @@ export class Menus {
 
   showMain(): void {
     const s = this.screen('menu-main');
-    const logo = el('div', 'menu-logo', s);
+    const hero = el('div', 'main-hero', s);
+    const logo = el('div', 'menu-logo', hero);
     logo.innerHTML = EMBLEM;
-    el('h1', 'menu-title', s).textContent = GAME_NAME;
-    el('p', 'menu-tag', s).textContent = t('menu.tagline');
+    el('h1', 'menu-title', hero).textContent = GAME_NAME;
+    el('div', 'menu-rule', hero);
+    el('p', 'menu-tag', hero).textContent = t('menu.tagline');
     const list = el('div', 'menu-list', s);
-    this.button(list, t('menu.skirmish'), () => this.showPreMatch(), 'menu-btn primary');
-    this.button(list, t('menu.tutorial'), () => this.cb.tutorial());
-    this.button(list, t('menu.settings'), () => this.showSettings(() => this.showMain()));
+    this.button(
+      list,
+      t('menu.skirmish'),
+      () => this.showPreMatch(),
+      'menu-btn primary',
+      MENU_ICONS.skirmish,
+    );
+    this.button(
+      list,
+      t('menu.tutorial'),
+      () => this.cb.tutorial(),
+      'menu-btn',
+      MENU_ICONS.tutorial,
+    );
+    this.button(
+      list,
+      t('menu.settings'),
+      () => this.showSettings(() => this.showMain()),
+      'menu-btn',
+      MENU_ICONS.settings,
+    );
     const row = el('div', 'menu-row', list);
-    this.button(row, t('menu.stats'), () => this.showStats(), 'menu-btn small');
-    this.button(row, t('menu.credits'), () => this.showCredits(), 'menu-btn small');
+    this.button(row, t('menu.stats'), () => this.showStats(), 'menu-btn small', MENU_ICONS.stats);
+    this.button(
+      row,
+      t('menu.credits'),
+      () => this.showCredits(),
+      'menu-btn small',
+      MENU_ICONS.credits,
+    );
     el('div', 'menu-foot', s).textContent = `v${GAME_VERSION}`;
   }
 
@@ -120,8 +188,12 @@ export class Menus {
       const c = el('button', 'pre-card' + (f.id === this.pre.faction ? ' selected' : ''), facs);
       c.type = 'button';
       c.style.setProperty('--accent', f.style.roof);
-      el('div', 'card-title', c).textContent = loc(f.name, lang);
-      el('div', 'card-body', c).textContent = loc(f.desc, lang);
+      const img = el('img', 'card-portrait', c);
+      img.src = factionPortrait(f.id);
+      img.alt = '';
+      const tx = el('div', 'card-text', c);
+      el('div', 'card-title', tx).textContent = loc(f.name, lang);
+      el('div', 'card-body', tx).textContent = loc(f.desc, lang);
       onPress(c, () => {
         this.cb.click();
         this.pre.faction = f.id;
@@ -136,9 +208,14 @@ export class Menus {
       const g = godDef(gid);
       const c = el('button', 'pre-card' + (gid === this.pre.god ? ' selected' : ''), gods);
       c.type = 'button';
-      el('div', 'card-title', c).textContent = `${loc(g.name, lang)} — ${loc(g.title, lang)}`;
-      el('div', 'card-body', c).textContent =
-        `${loc(g.desc, lang)} ${t('age.power')}: ${loc(powerDef(g.power).name, lang)}.`;
+      const pw = powerDef(g.power);
+      const img = el('img', 'card-portrait god', c);
+      img.src = powerIcon(pw.kind, pw.color);
+      img.alt = '';
+      const tx = el('div', 'card-text', c);
+      el('div', 'card-title', tx).textContent = `${loc(g.name, lang)} — ${loc(g.title, lang)}`;
+      el('div', 'card-body', tx).textContent =
+        `${loc(g.desc, lang)} ${t('age.power')}: ${loc(pw.name, lang)}.`;
       onPress(c, () => {
         this.cb.click();
         this.pre.god = gid;

@@ -4,11 +4,18 @@ import type { FactionId } from '../../data/types';
 import { PALETTE } from './palette';
 import { AtlasBuilder } from './atlas';
 import { drawBuilding, drawFoundation } from './procedural/buildings';
-import { drawProjectile, drawUnit } from './procedural/units';
+import {
+  CARRY_ARTS,
+  WORK_ACTS,
+  drawProjectile,
+  drawUnit,
+  poseName,
+  type Pose,
+} from './procedural/units';
 
 /**
  * Generates and packs all sprites needed for a match (units + buildings per player colour).
- * Frame names: `u:<unitId>:<slot>`, `b:<buildingId>:<slot>`, `found:<size>`, `p:<kind>`.
+ * Frame names: `u:<unitId>:<slot>[:<pose>]` (see `poseName`), `b:<buildingId>:<slot>`, `found:<size>`, `p:<kind>`.
  */
 export class MatchArt {
   private readonly lookup: Map<string, string>;
@@ -26,6 +33,15 @@ export class MatchArt {
         const cv = drawUnit(u, team);
         atlas.add(`u:${u.id}:${slot}`, cv);
         this.canvases.set(`u:${u.id}:${slot}`, cv);
+        if (u.art.shape !== 'humanoid') continue;
+        // Animation poses: a stride frame for everyone on foot; work and carry poses for workers.
+        const poses: Pose[] = [{ stride: true }];
+        if (u.cls === 'worker') {
+          for (const act of WORK_ACTS) poses.push({ act, frame: 0 }, { act, frame: 1 });
+          for (const carry of CARRY_ARTS) poses.push({ carry }, { carry, stride: true });
+        }
+        for (const pose of poses)
+          atlas.add(`u:${u.id}:${slot}:${poseName(pose)}`, drawUnit(u, team, pose));
       }
       for (const b of BUILDINGS) {
         if (b.factions && !b.factions.includes(p.faction)) continue;

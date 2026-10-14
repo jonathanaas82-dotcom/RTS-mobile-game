@@ -187,4 +187,5 @@ export const nb: Partial<Record<TranslationKey, string>> = {
   'terrain.4': 'Klippe',
   'feature.gold': 'Gullgruve ({amount})',
   'feature.berries': 'Bærbusk ({amount})',
+  'feature.fish': 'Fiskeplass ({amount})',
 };

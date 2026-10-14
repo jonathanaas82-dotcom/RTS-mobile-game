@@ -346,7 +346,10 @@ export class AIController implements Controller {
       let ok = false;
       if (kind === 'gold') ok = e.kind === 'resource' && e.def === 'gold';
       else {
-        ok = e.kind === 'resource' && e.def === 'berries';
+        ok = e.kind === 'resource' && (e.def === 'berries' || e.def === 'fish');
+        // A fishing spot fits three workers along its shore.
+        if (ok && e.def === 'fish')
+          ok = w.entities.filter((o) => !o.dead && o.order.target === e.id).length < 3;
         if (!ok && e.def === 'farm' && e.owner === this.me && e.built) {
           ok = !w.entities.some(
             (o) =>
@@ -429,7 +432,11 @@ export class AIController implements Controller {
     // Start farming before the berries run out so food never stalls.
     let berryFood = 0;
     for (const e of w.entities) {
-      if (!e.dead && e.def === 'berries' && (e.x - h.x) ** 2 + (e.y - h.y) ** 2 < 14 * 14)
+      if (
+        !e.dead &&
+        (e.def === 'berries' || e.def === 'fish') &&
+        (e.x - h.x) ** 2 + (e.y - h.y) ** 2 < 14 * 14
+      )
         berryFood += e.amount;
     }
     if (berryFood > 120 * Math.max(1, foodWorkers)) return;

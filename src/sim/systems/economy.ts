@@ -79,14 +79,16 @@ export function gatherBehavior(world: World, e: Entity): void {
     const w = world.map.width;
     arrived = approachRect(world, e, e.order.tile % w, Math.floor(e.order.tile / w), 1);
   } else if (t!.kind === 'building') {
-    // Farms are walkable: stand on the middle of the field.
-    const d = Math.sqrt((t!.x - e.x) ** 2 + (t!.y - e.y) ** 2);
-    arrived = d <= 0.7;
+    // Farms are walkable: work from the middle of the field (a little below centre, so the
+    // farmer reads as standing in the crop rather than on its back edge).
+    const fy = t!.y + 0.3;
+    const d = Math.sqrt((t!.x - e.x) ** 2 + (fy - e.y) ** 2);
+    arrived = d <= 0.45;
     if (arrived && isMoving(e)) stopMoving(e);
     if (!arrived && !isMoving(e) && world.tick >= e.repathAt) {
       e.tries++;
       e.repathAt = world.tick + RULES.chaseRepathTicks * 2;
-      moveTo(e, t!.x, t!.y);
+      moveTo(e, t!.x, fy);
     }
   } else {
     arrived = approachRect(world, e, t!.tileX, t!.tileY, t!.size);
