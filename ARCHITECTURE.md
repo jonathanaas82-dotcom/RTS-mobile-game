@@ -21,7 +21,7 @@ src/
   game/        createMatch(): Simulation + AI controllers (no Phaser)
   render/      Phaser: scenes, camera, entity/effects/fog renderers, minimap, procedural art
   ui/          DOM HUD, command card, menus, tutorial, gestures, selection, settings, stats
-  audio/       Procedural Web Audio sound effects (+ music hook)
+  audio/       Procedural Web Audio: sound effects, generative music (Music.ts), ambience
   i18n/        t(key) + en/nb dictionaries
   platform/    PWA, fullscreen/orientation, haptics; native.ts = Capacitor detection + native haptics
 build/         Vite plugins (service-worker precache)

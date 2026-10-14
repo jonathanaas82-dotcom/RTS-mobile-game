@@ -119,6 +119,7 @@ export const en = {
   'size.large': 'Large',
   'set.volume': 'Volume',
   'set.sound': 'Sound',
+  'set.music': 'Music',
   'set.on': 'On',
   'set.off': 'Off',
   'set.graphics': 'Graphics',

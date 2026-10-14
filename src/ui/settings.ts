@@ -11,6 +11,8 @@ export interface Settings {
   graphics: GraphicsQuality;
   masterVolume: number;
   muted: boolean;
+  /** Generative background music on/off (sound effects are separate). */
+  music: boolean;
   haptics: boolean;
   showDebug: boolean;
 }
@@ -25,6 +27,7 @@ export function defaultSettings(): Settings {
     graphics: 'high',
     masterVolume: 0.8,
     muted: false,
+    music: true,
     haptics: true,
     showDebug: false,
   };

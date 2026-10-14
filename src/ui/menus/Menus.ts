@@ -410,6 +410,15 @@ export class Menus {
       () => (st.muted ? 'off' : 'on'),
       (v) => (st.muted = v === 'off'),
     );
+    segRow<'on' | 'off'>(
+      t('set.music'),
+      [
+        ['on', t('set.on')],
+        ['off', t('set.off')],
+      ],
+      () => (st.music ? 'on' : 'off'),
+      (v) => (st.music = v === 'on'),
+    );
     segRow<GraphicsQuality>(
       t('set.graphics'),
       [

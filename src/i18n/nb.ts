@@ -121,6 +121,7 @@ export const nb: Partial<Record<TranslationKey, string>> = {
   'size.large': 'Stort',
   'set.volume': 'Volum',
   'set.sound': 'Lyd',
+  'set.music': 'Musikk',
   'set.on': 'På',
   'set.off': 'Av',
   'set.graphics': 'Grafikk',

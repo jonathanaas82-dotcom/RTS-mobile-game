@@ -70,6 +70,6 @@ Status legend: ✅ done in this repo · ⬜ needs a person/account/device · ⚠
 
 ## Before a 1.0 release (product)
 
-- ⬜ Replace placeholder art/audio through the asset manifest and the music hook.
+- ⬜ Optionally replace procedural art/audio (asset manifest; `Sfx`/`Music` in `src/audio`).
 - ⬜ Save/resume a match in progress (not implemented; the app auto-pauses when backgrounded).
 - ⬜ Playtest balance with humans (AI-vs-AI report: `npm run balance`).

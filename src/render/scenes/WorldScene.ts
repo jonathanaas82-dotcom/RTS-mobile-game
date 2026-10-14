@@ -20,7 +20,7 @@ import { MatchArt } from '../assets/matchArt';
 import { BUILDING_OVERHANG } from '../assets/procedural/buildings';
 import { TILE_PX } from '../assets/tileset';
 import { ART_RES } from '../assets/procedural/draw';
-import { GROUND_PAD, GROUND_PX, paintGround } from '../terrain/ground';
+import { GROUND_PAD, GROUND_PX, paintGround, type GroundChunk } from '../terrain/ground';
 import { TreeLayer } from '../terrain/trees';
 import { Ambience } from '../effects/Ambience';
 import { CameraModel } from '../camera/CameraModel';
@@ -31,6 +31,8 @@ import { PointerInput } from '../input/PointerInput';
 import { EffectsRenderer } from '../effects/EffectsRenderer';
 import { FogRenderer } from '../effects/FogRenderer';
 import { Minimap } from '../Minimap';
+import type { SoundName } from '../../audio/Sfx';
+import type { WorkAct } from '../assets/procedural/units';
 
 /** On-screen size of one tile in CSS px at default / min / max zoom. */
 const TILE_CSS_DEFAULT = 46;
@@ -66,6 +68,9 @@ export class WorldScene extends Phaser.Scene {
   private fogR!: FogRenderer;
   private fx!: EffectsRenderer;
   private minimap!: Minimap;
+  private groundChunks: GroundChunk[] = [];
+  /** Scene time of the last fight the player could see (drives the battle music). */
+  private lastCombat = -1e9;
   private nextMinimapAt = 0;
   private gameOverShown = false;
   /** Accumulated per-section frame time (ms) for the debug overlay / perf tests. */
@@ -92,14 +97,25 @@ export class WorldScene extends Phaser.Scene {
     this.buildTerrain();
     this.entities = new EntityRenderer(this, this.art);
     this.fx = new EffectsRenderer(this, this.art);
-    this.entities.onWorkImpact = (act, x, y, facing) => this.fx.workImpact(act, x, y, facing);
-    this.entities.onSplash = (x, y) => this.fx.splash(x, y);
+    this.entities.onWorkImpact = (act, x, y, facing) => {
+      this.fx.workImpact(act, x, y, facing);
+      const a = this.audioAt(x / TILE_PX, y / TILE_PX);
+      this.ctx.sfx.play(WORK_SOUND[act], a.gain * 0.8, a.pan);
+    };
+    this.entities.onSplash = (x, y) => {
+      this.fx.splash(x, y);
+      const a = this.audioAt(x / TILE_PX, y / TILE_PX);
+      this.ctx.sfx.play('splash', a.gain * 0.6, a.pan);
+    };
     this.entities.onSmoke = (x, y) => this.fx.smoke(x, y);
     this.fx.particles = this.ctx.settings.graphics !== 'low';
     this.fogR = new FogRenderer(this, this.world);
     this.ambience = new Ambience(this, this.world, this.ctx.settings.graphics);
-    this.minimap = new Minimap(this.ctx.hud.minimapSlot, this.world, (x, y) =>
-      this.centerOnTile(x, y),
+    this.minimap = new Minimap(
+      this.ctx.hud.minimapSlot,
+      this.world,
+      (x, y) => this.centerOnTile(x, y),
+      this.groundChunks.map((ch) => ({ ...ch, pad: GROUND_PAD })),
     );
     this.setupCamera();
     this.setupInput();
@@ -112,7 +128,10 @@ export class WorldScene extends Phaser.Scene {
     this.refreshHud(true);
     this.tutorial = data.tutorial ? this.createTutorial() : null;
     this.ctx.sfx.music('peace');
+    this.ctx.sfx.ambience(true);
+    this.lastCombat = -1e9;
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.ctx.sfx.ambience(false);
       this.pointer.destroy();
       this.tutorial?.destroy();
       this.tutorial = null;
@@ -128,7 +147,8 @@ export class WorldScene extends Phaser.Scene {
   private buildTerrain(): void {
     const map = this.world.map;
     for (let i = 0; this.textures.exists(`ground_${i}`); i++) this.textures.remove(`ground_${i}`);
-    paintGround(map).forEach((ch, i) => {
+    this.groundChunks = paintGround(map);
+    this.groundChunks.forEach((ch, i) => {
       const key = `ground_${i}`;
       this.textures.addCanvas(key, ch.canvas)?.setFilter(Phaser.Textures.FilterMode.LINEAR);
       const k = TILE_PX / GROUND_PX;
@@ -431,25 +451,64 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * Loudness and stereo position of a sound at tile (x, y): fades with distance from the screen
+   * centre and when zoomed far out, panned left/right by its horizontal offset.
+   */
+  private audioAt(x: number, y: number): { gain: number; pan: number } {
+    const v = this.cameras.main.worldView;
+    const dx = (x * TILE_PX - v.centerX) / (v.width / 2);
+    const dy = (y * TILE_PX - v.centerY) / (v.height / 2);
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const zoomF = Math.max(0.25, Math.min(1, 1100 / v.width));
+    return {
+      gain: Math.max(0, Math.min(1, 1.35 - dist * 0.75)) * zoomF,
+      pan: Math.max(-0.8, Math.min(0.8, dx * 0.7)),
+    };
+  }
+
+  /** A visible fight: switch to (or stay on) the battle music. */
+  private combatSeen(): void {
+    this.lastCombat = this.time.now;
+    if (this.world.winner < 0 && this.ctx.sfx.track !== 'battle') this.ctx.sfx.music('battle');
+  }
+
   /** Map sim events to sound effects (only for things the player can perceive). */
   private soundFor(ev: SimEvent): void {
     const sfx = this.ctx.sfx;
     const onScreen = (x: number, y: number): boolean =>
       this.fogAt(x, y) === 2 && this.cameras.main.worldView.contains(x * TILE_PX, y * TILE_PX);
+    const at = (name: SoundName, x: number, y: number, gain: number): void => {
+      const a = this.audioAt(x, y);
+      sfx.play(name, gain * a.gain, a.pan);
+    };
     switch (ev.type) {
       case 'hit':
-        if (onScreen(ev.x, ev.y)) sfx.play('hit', 0.6);
+        if (this.fogAt(ev.x, ev.y) === 2) this.combatSeen();
+        if (onScreen(ev.x, ev.y)) at('hit', ev.x, ev.y, 0.7);
         break;
       case 'attack':
         if (ev.ranged) {
           const e = this.world.byId.get(ev.id);
-          if (e && onScreen(e.x, e.y)) sfx.play('arrow', 0.6);
+          if (e && onScreen(e.x, e.y)) at('arrow', e.x, e.y, 0.7);
         }
         break;
       case 'death':
         if (ev.kind !== 'resource' && onScreen(ev.x, ev.y))
-          sfx.play('death', ev.kind === 'building' ? 1 : 0.6);
+          at('death', ev.x, ev.y, ev.kind === 'building' ? 1 : 0.7);
         break;
+      case 'treeCut': {
+        const w = this.world.map.width;
+        const tx = (ev.tile % w) + 0.5;
+        const ty = Math.floor(ev.tile / w) + 0.5;
+        if (onScreen(tx, ty)) at('treeFall', tx, ty, 0.8);
+        break;
+      }
+      case 'gathered': {
+        const e = this.world.byId.get(ev.id);
+        if (ev.owner === ME && e && onScreen(e.x, e.y)) at('gather', e.x, e.y, 0.8);
+        break;
+      }
       case 'built':
         if (ev.owner === ME) sfx.play('built');
         break;
@@ -463,7 +522,10 @@ export class WorldScene extends Phaser.Scene {
         if (ev.owner === ME || this.fogAt(ev.x, ev.y) === 2) sfx.play('power');
         break;
       case 'underAttack':
-        if (ev.owner === ME) sfx.play('alert');
+        if (ev.owner === ME) {
+          sfx.play('alert');
+          this.combatSeen();
+        }
         break;
       case 'error':
         if (ev.owner === ME) sfx.play('error');
@@ -783,6 +845,9 @@ export class WorldScene extends Phaser.Scene {
     this.fx.update(this.world, this.alpha, vis);
     this.fx.drawAreas(this.world, vis, (power) => parseInt(powerDef(power).color.slice(1), 16));
     lap('fx');
+    // Back to the peaceful music once no fighting has been seen for a while.
+    if (this.ctx.sfx.track === 'battle' && this.world.winner < 0 && time - this.lastCombat > 20000)
+      this.ctx.sfx.music('peace');
     if (time >= this.nextMinimapAt) {
       this.nextMinimapAt = time + 250;
       const v = this.cameras.main.worldView;
@@ -825,3 +890,13 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 }
+
+/** Sound for each worker activity's tool strike. */
+const WORK_SOUND: Record<WorkAct, SoundName> = {
+  chop: 'chop',
+  mine: 'mine',
+  build: 'hammer',
+  farm: 'hoe',
+  pick: 'pick',
+  fish: 'plop',
+};

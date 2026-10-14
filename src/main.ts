@@ -40,7 +40,7 @@ const ctx: AppContext = {
   sfx,
 };
 hud.attach(ctx);
-sfx.setVolume(settings.masterVolume, settings.muted);
+sfx.setVolume(settings.masterVolume, settings.muted, settings.music);
 
 const game = createGame(document.getElementById('game') as HTMLElement, ctx);
 let current: MatchStartData | null = null;
@@ -50,7 +50,7 @@ const menus = new Menus(document.getElementById('menu') as HTMLElement, settings
   tutorial: () => startMatch({ config: tutorialConfig(), tutorial: true }),
   settingsChanged: (s) => {
     hud.applySettings();
-    sfx.setVolume(s.masterVolume, s.muted);
+    sfx.setVolume(s.masterVolume, s.muted, s.music);
   },
   click: () => sfx.play('click'),
 });
