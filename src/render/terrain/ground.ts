@@ -26,10 +26,10 @@ const C = {
   shallow: [64, 164, 176] as RGB,
   deep: [22, 70, 120] as RGB,
   foam: [236, 246, 242] as RGB,
-  rockLight: [186, 176, 158] as RGB,
-  rockDark: [104, 96, 86] as RGB,
-  rockFace: [92, 80, 70] as RGB,
-  moss: [104, 132, 64] as RGB,
+  rockLight: [196, 182, 158] as RGB,
+  rockDark: [118, 106, 92] as RGB,
+  rockFace: [112, 94, 78] as RGB,
+  moss: [96, 136, 62] as RGB,
 };
 
 function smooth(e0: number, e1: number, x: number): number {
@@ -342,29 +342,75 @@ export function paintGround(map: GameMap): GroundChunk[] {
           out.r *= lk + (sh > 0 ? sh * 0.04 : 0);
           out.g *= lk;
           out.b *= lk + (sh < 0 ? -sh * 0.06 : 0);
-          // Cliffs: a lit plateau with moss, a striated rock face below it and a cast shadow.
+          // Cliffs: a raised plateau (lit rim, turf, cracks) with a tall layered rock wall below
+          // its south edge, narrow side walls, and a long shadow cast to the south-east.
           const cNear = nearCliff[ti] === 1;
           const cv = cNear ? cliff.at(u, v) : 0;
           const cn = cNear ? cv + n * 0.3 : 0;
-          const above = cNear ? Math.max(cliff.at(u, v - 0.45), cliff.at(u, v - 0.9)) + n * 0.3 : 0;
-          const shadow = cNear ? cliff.at(u - 0.5, v - 1.35) - cv : 0;
-          if (shadow > 0) {
-            const k = 1 - Math.min(0.42, shadow * 0.55);
-            out.r *= k;
-            out.g *= k;
-            out.b *= k * 1.02;
+          if (cNear) {
+            const shadow = cliff.at(u - 0.55, v - 1.5) - cv;
+            if (shadow > 0) {
+              const k = 1 - Math.min(0.45, shadow * 0.6);
+              out.r *= k;
+              out.g *= k;
+              out.b *= k * 1.03;
+            }
           }
-          const face = above > 0.45 && cn <= 0.5 ? smooth(0.45, 0.6, above) : 0;
-          if (face > 0) {
-            // Vertical strata: darker towards the foot, lit edges on the west side.
-            const strata = Math.sin(u * 23 + dt * 6) * 0.5 + 0.5;
-            const depth = smooth(0.45, 0.75, above) * 0.5;
-            const f: RGB = [
-              C.rockFace[0] * (0.82 + strata * 0.3 - depth * 0.3),
-              C.rockFace[1] * (0.82 + strata * 0.3 - depth * 0.3),
-              C.rockFace[2] * (0.85 + strata * 0.28 - depth * 0.25),
-            ];
-            mixInto(f, face);
+          if (cNear && cn < 0.53) {
+            // Coverage of the open ground (1) vs the plateau (0): blends the wall's top edge.
+            const ground = 1 - smooth(0.47, 0.53, cn);
+            // South wall: scan upwards for the plateau edge (wall height varies a little).
+            const H = CLIFF_H * (0.85 + (edge.at(u * 0.7, 3.3) - 0.5) * 0.6);
+            let d = -1;
+            let prev = cn;
+            for (let k = 1; k <= 12; k++) {
+              const dd = (k / 12) * H;
+              const val = cliff.at(u, v - dd) + (edge.at(u, v - dd) - 0.5) * 0.3;
+              if (val > 0.5) {
+                // Interpolate the exact crossing between the last two samples (smooth foot).
+                const f = (0.5 - prev) / Math.max(1e-4, val - prev);
+                d = dd - (1 - Math.min(1, Math.max(0, f))) * (H / 12);
+                break;
+              }
+              prev = val;
+            }
+            let wallW = 0;
+            if (d > 0) {
+              const t = d / H; // 0 at the lip, 1 at the foot
+              // Horizontal strata with a slight wobble, vertical cracks, lit lip, dark foot.
+              const band = Math.sin((t * 4.4 + dt * 0.7 + Math.sin(u * 1.7) * 0.2) * Math.PI);
+              const crack = Math.abs(Math.sin(u * 9 + dt * 6 + t * 1.5));
+              let k = 1 + band * 0.1 + dt * 0.25;
+              k *= 1 - (1 - smooth(0.03, 0.12, crack)) * 0.3;
+              k *= 1.3 - t * 0.55; // light near the lip, occluded at the foot
+              const lip = 1 - smooth(0.02, 0.12, t);
+              const wall: RGB = [
+                C.rockFace[0] * k + 40 * lip,
+                C.rockFace[1] * k + 32 * lip,
+                C.rockFace[2] * k + 18 * lip,
+              ];
+              wallW = ground * (1 - smooth(0.9, 1, t));
+              mixInto(wall, wallW);
+              // Dark seam where the wall meets the ground.
+              const seam = smooth(0.84, 0.98, t) * (1 - smooth(0.98, 1.08, t));
+              out.r *= 1 - seam * 0.3;
+              out.g *= 1 - seam * 0.3;
+              out.b *= 1 - seam * 0.26;
+            }
+            // Side walls: lit on the west-facing edge, shaded on the east-facing one.
+            const east = smooth(0.46, 0.56, cliff.at(u - 0.3, v) + n * 0.3);
+            const west = smooth(0.46, 0.56, cliff.at(u + 0.3, v) + n * 0.3);
+            const sideW = Math.max(east, west) * ground * (1 - wallW);
+            if (sideW > 0.01) {
+              const f = west > east ? 1.18 : 0.66;
+              const strata = 1 + Math.sin((v * 4.4 + dt) * Math.PI) * 0.08;
+              const side: RGB = [
+                C.rockFace[0] * f * strata,
+                C.rockFace[1] * f * strata,
+                C.rockFace[2] * f * strata * 1.04,
+              ];
+              mixInto(side, sideW * 0.9);
+            }
           }
           if (cn > 0.45) {
             const t = smooth(0.45, 0.53, cn);
@@ -375,24 +421,26 @@ export function paintGround(map: GameMap): GroundChunk[] {
               C.rockDark[2] + (C.rockLight[2] - C.rockDark[2]) * rock,
             ];
             // Cracks.
-            if (Math.abs(Math.sin(u * 9 + v * 4 + dt * 9)) < 0.06) {
-              r[0] *= 0.7;
-              r[1] *= 0.7;
-              r[2] *= 0.7;
-            }
-            // Moss and highland turf over the plateau interior; bare rock stays near the rim.
+            const ck =
+              1 - (1 - smooth(0.02, 0.1, Math.abs(Math.sin(u * 7 + v * 3 + dt * 8)))) * 0.25;
+            r[0] *= ck;
+            r[1] *= ck;
+            r[2] *= ck;
+            // Highland turf over the plateau interior; bare rock stays near the rim.
             const moss = Math.min(
-              0.85,
-              smooth(0.55, 0.8, mo + dt * 0.4) * 0.5 + smooth(0.68, 0.92, cn + dt * 0.3) * 0.6,
+              0.9,
+              smooth(0.45, 0.75, mo + dt * 0.4) * 0.45 + smooth(0.6, 0.85, cn + dt * 0.35) * 0.75,
             );
             if (moss > 0) {
               r[0] += (C.moss[0] - r[0]) * moss;
               r[1] += (C.moss[1] - r[1]) * moss;
               r[2] += (C.moss[2] - r[2]) * moss;
             }
-            // Bright rim along the north and west edges of the plateau.
-            const rim = smooth(0.45, 0.6, cn) * (1 - smooth(0.6, 0.8, cn));
-            const lit = 1 + rim * 0.35;
+            // Edge lighting from the cliff field's slope: bright rim on north/west edges,
+            // darker lip on south/east ones; the raised top catches a bit more sun overall.
+            const gx = cliff.at(u + 0.15, v) - cliff.at(u - 0.15, v);
+            const gy = cliff.at(u, v + 0.15) - cliff.at(u, v - 0.15);
+            const lit = 1.08 + Math.max(-0.35, Math.min(0.45, (gx + gy) * 1.6));
             r[0] *= lit;
             r[1] *= lit;
             r[2] *= lit;
@@ -446,6 +494,9 @@ export function paintGround(map: GameMap): GroundChunk[] {
   }
   return chunks;
 }
+
+/** Height of cliff walls in tiles (drawn below the plateau's south edge). */
+const CLIFF_H = 1.35;
 
 /** Half-resolution pixels per tile for the animated water layers. */
 export const WAVE_PX = GROUND_PX / 2;
@@ -556,9 +607,27 @@ function decorate(
       const r = (k: number): number => tileHash(tx, ty, 0x77 + k);
       const ox = (tx - cx) * P;
       const oy = (ty - cy) * P;
-      const free = !mask[ty * W + tx];
+      // The tile right below a cliff is covered by its wall: keep clutter off it.
+      const underWall = tileAt(tx, ty - 1) === Terrain.Cliff && t !== Terrain.Cliff;
+      const free = !mask[ty * W + tx] && !underWall;
+      if (
+        !underWall &&
+        t !== Terrain.Cliff &&
+        tileAt(tx, ty - 2) === Terrain.Cliff &&
+        t !== Terrain.Water
+      ) {
+        // Scree: fallen rocks gathered at the foot of the wall.
+        for (let k = 0; k < 4; k++)
+          boulder(
+            c,
+            ox + 5 + r(300 + k) * (P - 10),
+            oy + 4 + r(310 + k) * 7,
+            1.6 + r(320 + k) * 2.2,
+            r,
+          );
+      }
       const inPlaza = plaza.at(tx + 0.5, ty + 0.5) > 0.4;
-      if (t === Terrain.Grass) {
+      if (t === Terrain.Grass && !underWall) {
         // Grass blades: short strokes, light tips over darker roots (texture, not speckle).
         const blades = inPlaza ? 2 : 7;
         for (let k = 0; k < blades; k++) {

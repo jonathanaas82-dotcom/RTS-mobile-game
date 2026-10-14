@@ -10,6 +10,7 @@ import {
   outlined,
   shade,
   softShadow,
+  sunlight,
 } from '../assets/procedural/draw';
 import { TILE_PX } from '../assets/tileset';
 import { CHUNK_TILES } from './ground';
@@ -108,6 +109,7 @@ const TREE_BASE = 0.91;
 
 export function treeCanvas(kind: 'broad' | 'pine', seed: number, leaf: string): HTMLCanvasElement {
   const fig = treeFigure(kind, seed, leaf);
+  sunlight(fig, TREE_BASE * TREE_H * ART_RES, 3, true);
   const [out, oc] = createCanvas(TREE_W * ART_RES, TREE_H * ART_RES);
   oc.scale(ART_RES, ART_RES);
   softShadow(oc, TREE_W / 2 + 10, TREE_H - 9, 26, 8, 0.45);

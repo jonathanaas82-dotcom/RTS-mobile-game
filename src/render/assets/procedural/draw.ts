@@ -207,3 +207,42 @@ export function castShadow(src: HTMLCanvasElement, baseY: number, alpha = 0.32):
   for (const [dx, dy] of offs) oc.drawImage(sil, dx, dy);
   return out;
 }
+
+/**
+ * Sun lighting for a figure (in place): a warm rim light along its upper edges, a soft sheen
+ * on the top and ambient-occlusion shading towards its base. The rim follows the silhouette
+ * from above (with a slight left bias when `fromLeft`), so it still reads correctly on sprites
+ * that are mirrored at runtime.
+ */
+export function sunlight(fig: HTMLCanvasElement, baseY: number, rim = 2.2, fromLeft = false): void {
+  const W = fig.width;
+  const H = fig.height;
+  // Rim: the silhouette minus itself shifted down (and right), i.e. the upper edges.
+  const [edge, ec] = createCanvas(W, H);
+  ec.drawImage(fig, 0, 0);
+  ec.globalCompositeOperation = 'source-in';
+  ec.fillStyle = 'rgb(255,236,190)';
+  ec.fillRect(0, 0, W, H);
+  ec.globalCompositeOperation = 'destination-out';
+  ec.drawImage(fig, fromLeft ? rim : rim * 0.25, rim);
+  const c = fig.getContext('2d')!;
+  c.save();
+  // Callers may leave a drawing scale on the context: work in raw pixels.
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.globalCompositeOperation = 'source-atop';
+  // Ambient occlusion: darker and slightly cooler towards the feet / ground.
+  const ao = c.createLinearGradient(0, baseY * 0.45, 0, baseY);
+  ao.addColorStop(0, 'rgba(20,18,40,0)');
+  ao.addColorStop(1, 'rgba(20,18,40,0.28)');
+  c.fillStyle = ao;
+  c.fillRect(0, 0, W, H);
+  // Soft warm sheen from above.
+  const sheen = c.createLinearGradient(0, 0, 0, baseY * 0.6);
+  sheen.addColorStop(0, 'rgba(255,230,170,0.16)');
+  sheen.addColorStop(1, 'rgba(255,230,170,0)');
+  c.fillStyle = sheen;
+  c.fillRect(0, 0, W, H);
+  c.globalAlpha = 0.55;
+  c.drawImage(edge, 0, 0);
+  c.restore();
+}

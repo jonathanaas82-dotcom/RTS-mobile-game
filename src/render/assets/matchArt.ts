@@ -10,6 +10,7 @@ import {
   drawProjectile,
   drawUnit,
   poseName,
+  unitShadow,
   type Pose,
 } from './procedural/units';
 
@@ -25,6 +26,7 @@ export class MatchArt {
 
   constructor(textures: Phaser.Textures.TextureManager, players: Array<{ faction: FactionId }>) {
     const atlas = new AtlasBuilder();
+    const shadowed = new Set<string>();
     players.forEach((p, slot) => {
       const team = PALETTE.players[slot] ?? '#ffffff';
       const f = factionDef(p.faction);
@@ -33,6 +35,11 @@ export class MatchArt {
         const cv = drawUnit(u, team);
         atlas.add(`u:${u.id}:${slot}`, cv);
         this.canvases.set(`u:${u.id}:${slot}`, cv);
+        if (!shadowed.has(u.id)) {
+          shadowed.add(u.id);
+          const sh = unitShadow(u, cv);
+          if (sh) atlas.add(`us:${u.id}`, sh);
+        }
         if (u.art.shape !== 'humanoid') continue;
         // Animation poses: a stride frame for everyone on foot; work and carry poses for workers.
         const poses: Pose[] = [{ stride: true }];

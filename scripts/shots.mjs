@@ -182,6 +182,40 @@ if (run('4')) {
   await shot('4-farming', frame, 1600, 'farm');
 }
 
+// ── Match 5: a cliff up close (fog hidden for the photo) ──
+if (run('5')) {
+  await open('?play=1&demo=1&seed=valhollow&faction=hrimfolk&god=thunrak');
+  await shot('5-cliff', () => {
+    const s = window.__godforge.game.scene.getScene('World');
+    const w = s.sim.world;
+    s.fastForward(20 * 120);
+    const m = w.map;
+    const st = m.starts[0];
+    let best = null;
+    let bd = 1e9;
+    for (let y = 1; y < m.height - 2; y++)
+      for (let x = 1; x < m.width - 1; x++) {
+        // A cliff tile with open ground below it (a visible south wall).
+        if (m.tiles[y * m.width + x] !== 4 || m.tiles[(y + 1) * m.width + x] === 4) continue;
+        if (x < 6 || y < 6 || x > m.width - 7 || y > m.height - 7) continue;
+        // Plateau above (cliff 2 tiles up, and to both sides) and a run of wall along the edge.
+        const at = (dx, dy) => m.tiles[(y + dy) * m.width + x + dx];
+        if (at(0, -1) !== 4 || at(0, -2) !== 4 || at(-1, 0) !== 4 || at(1, 0) !== 4) continue;
+        if (at(0, 2) === 4 || at(0, 1) === 2) continue;
+        const d = (x - st.x) ** 2 + (y - st.y) ** 2;
+        if (d < bd) {
+          bd = d;
+          best = { x, y };
+        }
+      }
+    if (!best) return 'no cliff';
+    s.fogR.setVisible(false);
+    s.camModel.zoom = (58 * s.ctx.renderScale) / 64;
+    s.centerOnTile(best.x + 0.5, best.y + 0.8);
+    return `${best.x},${best.y}`;
+  });
+}
+
 // ── Match 2: Aurelian League town ──
 if (run('2')) {
   await open('?play=1&demo=1&seed=marblebay&faction=aurelian&god=aetheon');

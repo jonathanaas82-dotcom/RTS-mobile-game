@@ -6,7 +6,7 @@ import type { MatchArt } from '../assets/matchArt';
 import { TILE_PX } from '../assets/tileset';
 import { ART_RES } from '../assets/procedural/draw';
 import { PALETTE } from '../assets/palette';
-import { rodTip, type WorkAct } from '../assets/procedural/units';
+import { UNIT_FEET, rodTip, type WorkAct } from '../assets/procedural/units';
 
 const TEAM = PALETTE.players.map((c) => parseInt(c.slice(1), 16));
 /** Buildings that send up hearth smoke. */
@@ -117,6 +117,18 @@ export class EntityRenderer {
           !working && sinceAttack >= 0 && sinceAttack < 3 ? e.facing * (3 - sinceAttack) * 3 : 0;
         s.setPosition(x + lunge, y + bob);
         s.setFlipX(e.facing < 0);
+        // Long cast shadow (never mirrored: the sun stays in the north-west).
+        const usk = `us:${e.def}`;
+        if (!v.shadow && this.art.has(usk)) {
+          const [key, frame] = this.art.frame(usk);
+          const img = this.scene.add
+            .image(0, 0, key, frame)
+            .setScale(1 / ART_RES)
+            .setDepth(-0.85);
+          img.setOrigin((s.width * 0.5) / img.width, (s.height * UNIT_FEET) / img.height);
+          v.shadow = img;
+        }
+        v.shadow?.setPosition(x + lunge, y).setVisible(true);
         if (anim?.act === 'fish') this.fishingLine(world, e, s, anim.frame as 0 | 1, time);
         // Walking sway and a forward lean while striking.
         s.setAngle((moving ? step * 3 : 0) + (lunge !== 0 ? e.facing * 6 : 0));

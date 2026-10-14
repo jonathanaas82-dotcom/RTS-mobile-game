@@ -10,6 +10,7 @@ import {
   shade,
   castShadow,
   softShadow,
+  sunlight,
   vgrad,
 } from './draw';
 
@@ -168,6 +169,7 @@ export function drawBuilding(def: BuildingDef, f: FactionDef, team: string): HTM
     softShadow(oc, W * 0.55, OH + W * 0.8, W * 0.46, W * 0.14, 0.28);
   }
   oc.setTransform(1, 0, 0, 1, 0, 0);
+  if (def.art !== 'farm') sunlight(body, (OH + W * 0.9) * ART_RES, 3.5, true);
   oc.drawImage(outlined(body, 3), 0, 0);
   bodies.set(out, body);
   return out;

@@ -1,6 +1,17 @@
 import type { FactionId, UnitDef } from '../../../data/types';
 import { TILE_PX } from '../tileset';
-import { ART_RES, createCanvas, dgrad, outlined, rgrad, shade, softShadow, vgrad } from './draw';
+import {
+  ART_RES,
+  castShadow,
+  createCanvas,
+  dgrad,
+  outlined,
+  rgrad,
+  shade,
+  softShadow,
+  sunlight,
+  vgrad,
+} from './draw';
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -139,11 +150,29 @@ export function drawUnit(def: UnitDef, team: string, pose: Pose = {}): HTMLCanva
       break;
   }
   c.restore();
+  sunlight(fig, S * 0.86, Math.max(1.6, S / 64));
   const [out, oc] = createCanvas(S, S);
   const flying = def.art.shape === 'flyer';
-  softShadow(oc, S * 0.5, S * 0.87, S * (flying ? 0.2 : 0.27), S * 0.07, flying ? 0.25 : 0.4);
+  // Small contact shadow under the feet; the long cast shadow is a separate sprite.
+  softShadow(oc, S * 0.5, S * 0.87, S * (flying ? 0.2 : 0.22), S * 0.06, flying ? 0.25 : 0.3);
   oc.drawImage(outlined(fig, Math.max(2, S / 48)), 0, 0);
+  figures.set(out, fig);
   return out;
+}
+
+const figures = new WeakMap<HTMLCanvasElement, HTMLCanvasElement>();
+
+/** Fraction of the unit canvas height where the feet stand (sprite origin y). */
+export const UNIT_FEET = 0.86;
+
+/**
+ * Long cast shadow for a unit canvas from `drawUnit` (same top-left origin, feet at
+ * (0.5, UNIT_FEET) of the source size), or null for flyers, which keep a soft ground blob.
+ */
+export function unitShadow(def: UnitDef, unit: HTMLCanvasElement): HTMLCanvasElement | null {
+  const fig = figures.get(unit);
+  if (!fig || def.art.shape === 'flyer') return null;
+  return castShadow(fig, fig.height * UNIT_FEET, 0.3);
 }
 
 // ───────────────────────── humanoids ─────────────────────────
