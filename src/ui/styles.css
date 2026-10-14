@@ -1042,3 +1042,16 @@ body {
   pointer-events: none;
   background: radial-gradient(ellipse at 50% 45%, transparent 55%, rgba(8, 12, 6, 0.38) 100%);
 }
+
+/* Warm late-afternoon sunlight from the upper left (matches the cast shadows). */
+#game::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  /* Plain alpha (no blend modes): cheap to composite over the canvas on phones. */
+  background:
+    radial-gradient(ellipse at 8% 0%, rgba(255, 220, 150, 0.1), transparent 50%),
+    linear-gradient(160deg, transparent 60%, rgba(30, 50, 100, 0.08));
+}

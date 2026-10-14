@@ -3,7 +3,14 @@ import type { GameMap } from '../../sim/map/mapgen';
 import { Terrain } from '../../sim/map/terrain';
 import { tileHash, valueNoise } from '../../sim/map/noise';
 import { AtlasBuilder } from '../assets/atlas';
-import { ART_RES, createCanvas, outlined, shade, softShadow } from '../assets/procedural/draw';
+import {
+  ART_RES,
+  castShadow,
+  createCanvas,
+  outlined,
+  shade,
+  softShadow,
+} from '../assets/procedural/draw';
 import { TILE_PX } from '../assets/tileset';
 import { CHUNK_TILES } from './ground';
 
@@ -87,11 +94,20 @@ function pine(c: Ctx, seed: number, leaf: string): void {
   }
 }
 
-export function treeCanvas(kind: 'broad' | 'pine', seed: number, leaf: string): HTMLCanvasElement {
+/** Bare tree figure (no outline or contact shadow), used for the cast shadow. */
+function treeFigure(kind: 'broad' | 'pine', seed: number, leaf: string): HTMLCanvasElement {
   const [fig, c] = createCanvas(TREE_W * ART_RES, TREE_H * ART_RES);
   c.scale(ART_RES, ART_RES);
   if (kind === 'broad') broadleaf(c, seed, leaf);
   else pine(c, seed, leaf);
+  return fig;
+}
+
+/** Base row of the trunk in tree-canvas pixels (matches the 0.91 sprite origin). */
+const TREE_BASE = 0.91;
+
+export function treeCanvas(kind: 'broad' | 'pine', seed: number, leaf: string): HTMLCanvasElement {
+  const fig = treeFigure(kind, seed, leaf);
   const [out, oc] = createCanvas(TREE_W * ART_RES, TREE_H * ART_RES);
   oc.scale(ART_RES, ART_RES);
   softShadow(oc, TREE_W / 2 + 10, TREE_H - 9, 26, 8, 0.45);
@@ -124,6 +140,7 @@ const VARIANTS = 4;
 
 interface Tree {
   img: Phaser.GameObjects.Image;
+  shadow: Phaser.GameObjects.Image | null;
   phase: number;
 }
 
@@ -139,6 +156,8 @@ export class TreeLayer {
   private readonly cols: number;
   private readonly lookup: Map<string, string>;
   private readonly map: GameMap;
+  /** Pixel size of each tree variant's shadow texture (to align its origin with the trunk). */
+  private readonly shadowSize = new Map<string, [number, number]>();
   sway = true;
 
   constructor(scene: Phaser.Scene, map: GameMap) {
@@ -146,8 +165,15 @@ export class TreeLayer {
     this.map = map;
     const atlas = new AtlasBuilder();
     for (let v = 0; v < VARIANTS; v++) {
-      atlas.add(`broad${v}`, treeCanvas('broad', v * 31 + 5, LEAVES[v % LEAVES.length]!));
-      atlas.add(`pine${v}`, treeCanvas('pine', v * 17 + 3, PINES[v % PINES.length]!));
+      for (const [kind, seed, leaf] of [
+        ['broad', v * 31 + 5, LEAVES[v % LEAVES.length]!],
+        ['pine', v * 17 + 3, PINES[v % PINES.length]!],
+      ] as const) {
+        atlas.add(`${kind}${v}`, treeCanvas(kind, seed, leaf));
+        const sh = castShadow(treeFigure(kind, seed, leaf), TREE_BASE * TREE_H * ART_RES, 0.3);
+        atlas.add(`${kind}${v}_s`, sh);
+        this.shadowSize.set(`${kind}${v}`, [sh.width, sh.height]);
+      }
     }
     atlas.add('stump', stumpCanvas());
     this.lookup = atlas.build(scene.textures, 'trees');
@@ -177,10 +203,20 @@ export class TreeLayer {
     const [key, f] = this.frame(name);
     const img = this.scene.add
       .image(x * TILE_PX, y * TILE_PX, key, f)
-      .setOrigin(0.5, 0.91)
+      .setOrigin(0.5, TREE_BASE)
       .setScale(scale / ART_RES)
       .setDepth(y * TILE_PX);
-    const tree = { img, phase: tileHash(tx, ty, 99) * 6.28 };
+    let shadow: Phaser.GameObjects.Image | null = null;
+    const size = this.shadowSize.get(name);
+    if (size) {
+      const [sk, sf] = this.frame(`${name}_s`);
+      shadow = this.scene.add
+        .image(x * TILE_PX, y * TILE_PX, sk, sf)
+        .setOrigin((TREE_W * ART_RES) / 2 / size[0], (TREE_BASE * TREE_H * ART_RES) / size[1])
+        .setScale(scale / ART_RES)
+        .setDepth(-0.95);
+    }
+    const tree = { img, shadow, phase: tileHash(tx, ty, 99) * 6.28 };
     this.chunks[this.chunkOf(tx, ty)]!.push(tree);
     return tree;
   }
@@ -223,6 +259,14 @@ export class TreeLayer {
         ease: 'Quad.easeIn',
         onComplete: () => img.destroy(),
       });
+      const sh = t.shadow;
+      if (sh)
+        this.scene.tweens.add({
+          targets: sh,
+          alpha: 0,
+          duration: 500,
+          onComplete: () => sh.destroy(),
+        });
       const stump = this.add(tx, ty, 'stump', img.x / TILE_PX, img.y / TILE_PX, 1);
       stump.img.setDepth(stump.img.y - 20);
       stump.phase = -1;
@@ -250,7 +294,10 @@ export class TreeLayer {
       const list = this.chunks[k]!;
       if (vis !== this.chunkVisible[k]) {
         this.chunkVisible[k] = vis;
-        for (const t of list) t.img.setVisible(vis);
+        for (const t of list) {
+          t.img.setVisible(vis);
+          t.shadow?.setVisible(vis);
+        }
       }
       if (vis && this.sway) {
         for (const t of list)

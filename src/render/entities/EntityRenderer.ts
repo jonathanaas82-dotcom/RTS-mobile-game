@@ -25,6 +25,8 @@ interface View {
   workFrame: number;
   /** Foundation scaffold under buildings being constructed. */
   base: Phaser.GameObjects.Image | null;
+  /** Cast shadow on the ground (buildings). */
+  shadow: Phaser.GameObjects.Image | null;
   frameName: string;
   seen: number;
 }
@@ -167,6 +169,21 @@ export class EntityRenderer {
           x - (e.size * TILE_PX) / 2,
           y - (e.size * TILE_PX) / 2 - BUILDING_OVERHANG * TILE_PX,
         );
+        if (e.kind === 'building') {
+          const sk = `bs:${e.def}:${e.owner}`;
+          if (!v.shadow && this.art.has(sk)) {
+            const [key, frame] = this.art.frame(sk);
+            v.shadow = this.scene.add
+              .image(0, 0, key, frame)
+              .setOrigin(0, 0)
+              .setScale(1 / ART_RES);
+          }
+          v.shadow
+            ?.setPosition(s.x, s.y)
+            .setDepth(-0.9)
+            .setAlpha(e.built ? 1 : 0.25 + 0.75 * e.progress)
+            .setVisible(true);
+        }
         // Fields are flat: keep them on the ground (under footprint rings and units).
         s.setDepth(e.def === 'farm' ? -0.6 : y + (e.size * TILE_PX) / 2 - 10);
         if (e.kind === 'building') {
@@ -382,7 +399,7 @@ export class EntityRenderer {
     const prevWork = v?.workFrame ?? -1;
     if (v) {
       // Same entity, new animation frame: just swap the texture frame on the sprite.
-      if (e.kind === 'unit' && !v.base) {
+      if (e.kind === 'unit' && !v.base && !v.shadow) {
         const [key, frame] = this.art.frame(name);
         v.sprite.setTexture(key, frame);
         v.frameName = name;
@@ -409,7 +426,7 @@ export class EntityRenderer {
       .setCrop()
       .setAngle(0)
       .setScale(1 / ART_RES);
-    v = { sprite, base: null, frameName: name, seen: 0, workFrame: prevWork };
+    v = { sprite, base: null, shadow: null, frameName: name, seen: 0, workFrame: prevWork };
     this.views.set(e.id, v);
     return v;
   }
@@ -423,6 +440,7 @@ export class EntityRenderer {
     v.sprite.setVisible(false);
     this.pool.push(v.sprite);
     v.base?.destroy();
+    v.shadow?.destroy();
     this.views.delete(id);
   }
 

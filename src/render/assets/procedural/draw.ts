@@ -164,3 +164,46 @@ export function softShadow(
   c.fill();
   c.restore();
 }
+
+/** Sun direction for cast shadows: how far a shadow reaches right / down per unit of height. */
+export const SHADOW_KX = 0.62;
+export const SHADOW_KY = 0.22;
+
+/**
+ * Project a sprite's silhouette onto the ground as a soft cast shadow (sun from the north-west,
+ * so shadows fall to the lower right). Pixels on the row `baseY` stay put; higher pixels are
+ * sheared right and flattened. The result shares the source's top-left origin and is larger to
+ * the right and bottom; its alpha fades with distance from the base.
+ */
+export function castShadow(src: HTMLCanvasElement, baseY: number, alpha = 0.32): HTMLCanvasElement {
+  const kx = SHADOW_KX;
+  const ky = SHADOW_KY;
+  const W = Math.ceil(src.width + kx * baseY + 6);
+  const H = Math.ceil(Math.max(src.height, baseY * (1 + ky)) + 6);
+  const [sil, sc] = createCanvas(W, H);
+  sc.setTransform(1, 0, -kx, -ky, kx * baseY, baseY * (1 + ky));
+  sc.drawImage(src, 0, 0);
+  sc.setTransform(1, 0, 0, 1, 0, 0);
+  sc.globalCompositeOperation = 'source-in';
+  sc.fillStyle = 'rgb(16,24,14)';
+  sc.fillRect(0, 0, W, H);
+  // Fade towards the far end of the shadow.
+  sc.globalCompositeOperation = 'destination-in';
+  const g = sc.createLinearGradient(0, baseY, kx * baseY, baseY * (1 + ky));
+  g.addColorStop(0, 'rgba(0,0,0,1)');
+  g.addColorStop(1, 'rgba(0,0,0,0.45)');
+  sc.fillStyle = g;
+  sc.fillRect(0, 0, W, H);
+  // Soft edge: a few offset copies.
+  const [out, oc] = createCanvas(W, H);
+  const offs: Array<[number, number]> = [
+    [0, 0],
+    [1.5, 0],
+    [-1.5, 0],
+    [0, 1.5],
+    [0, -1.5],
+  ];
+  oc.globalAlpha = alpha / 2.2;
+  for (const [dx, dy] of offs) oc.drawImage(sil, dx, dy);
+  return out;
+}

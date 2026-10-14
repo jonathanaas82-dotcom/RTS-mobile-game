@@ -61,8 +61,11 @@ tests/         Vitest unit tests (sim, input, camera, i18n)
 - **Painted terrain.** `render/terrain/ground.ts` blends blurred terrain indicator fields with
   noise into 16×16-tile chunk textures (padded by a pixel to avoid seams under linear filtering);
   `render/terrain/trees.ts` turns forest tiles into depth-sorted, culled, swaying tree sprites.
-  Fog (`FogRenderer`), cloud shadows and water glints (`Ambience`) are purely cosmetic and never
-  touch sim state.
+  The ground painter adds a height field (hill shading), meadow/dirt biomes, worn earth around
+  bases, plateau cliffs with rock faces, baked props, and two animated ripple layers per watery
+  chunk. Trees and buildings cast skewed silhouette shadows (`castShadow`, sun from the NW).
+  Fog (`FogRenderer`), cloud shadows, water glints, birds and butterflies (`Ambience`) and the
+  camera colour grade (WebGL, Medium/High) are purely cosmetic and never touch sim state.
 - **Real time.** The sim is driven by Phaser's `rawDelta` (unsmoothed); Phaser's capped `delta`
   would slow the match on a struggling device.
 

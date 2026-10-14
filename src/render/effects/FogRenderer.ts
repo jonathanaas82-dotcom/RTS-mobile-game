@@ -63,6 +63,8 @@ export class FogRenderer {
       const v = fog[i];
       this.tileAlpha[i] = v === 2 ? 0 : v === 1 ? ALPHA_EXPLORED : ALPHA_UNEXPLORED;
     }
+    // Two blur passes + linear sampling: soft gradients without per-tile plateaus.
+    blur121(this.tileAlpha, w, h);
     blur121(this.tileAlpha, w, h);
     const px = this.data.data;
     const W = w * RES;
@@ -71,13 +73,11 @@ export class FogRenderer {
     for (let y = 0; y < H; y++) {
       const fy = Math.min(h - 1.001, Math.max(0, (y + 0.5) / RES - 0.5));
       const y0 = fy | 0;
-      let ty = fy - y0;
-      ty = ty * ty * (3 - 2 * ty);
+      const ty = fy - y0;
       for (let x = 0; x < W; x++) {
         const fx = Math.min(w - 1.001, Math.max(0, (x + 0.5) / RES - 0.5));
         const x0 = fx | 0;
-        let tx = fx - x0;
-        tx = tx * tx * (3 - 2 * tx);
+        const tx = fx - x0;
         const i = y0 * w + x0;
         const a = ta[i] as number;
         const b = ta[i + 1] as number;

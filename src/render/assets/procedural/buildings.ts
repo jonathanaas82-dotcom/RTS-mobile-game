@@ -8,6 +8,7 @@ import {
   rgrad,
   seeded,
   shade,
+  castShadow,
   softShadow,
   vgrad,
 } from './draw';
@@ -164,11 +165,29 @@ export function drawBuilding(def: BuildingDef, f: FactionDef, team: string): HTM
     oc.beginPath();
     oc.roundRect(0, OH, W, W, W * 0.25);
     oc.fill();
-    softShadow(oc, W * 0.58, OH + W * 0.8, W * 0.48, W * 0.16, 0.45);
+    softShadow(oc, W * 0.55, OH + W * 0.8, W * 0.46, W * 0.14, 0.28);
   }
   oc.setTransform(1, 0, 0, 1, 0, 0);
   oc.drawImage(outlined(body, 3), 0, 0);
+  bodies.set(out, body);
   return out;
+}
+
+const bodies = new WeakMap<HTMLCanvasElement, HTMLCanvasElement>();
+
+/**
+ * Cast shadow for a building canvas from `drawBuilding` (same top-left origin), or null for flat
+ * buildings. The building is treated as standing on the front edge of its footprint.
+ */
+export function buildingShadow(
+  def: BuildingDef,
+  building: HTMLCanvasElement,
+): HTMLCanvasElement | null {
+  const body = bodies.get(building);
+  if (!body || def.art === 'farm') return null;
+  const W = def.size * TILE_PX;
+  const OH = Math.round(BUILDING_OVERHANG * TILE_PX);
+  return castShadow(body, (OH + W * 0.9) * ART_RES, 0.34);
 }
 
 // ───────────────────────── materials ─────────────────────────

@@ -3,7 +3,7 @@ import { BUILDINGS, UNITS, buildingDef, factionDef } from '../../data';
 import type { FactionId } from '../../data/types';
 import { PALETTE } from './palette';
 import { AtlasBuilder } from './atlas';
-import { drawBuilding, drawFoundation } from './procedural/buildings';
+import { buildingShadow, drawBuilding, drawFoundation } from './procedural/buildings';
 import {
   CARRY_ARTS,
   WORK_ACTS,
@@ -47,6 +47,8 @@ export class MatchArt {
         if (b.factions && !b.factions.includes(p.faction)) continue;
         const cv = drawBuilding(b, f, team);
         atlas.add(`b:${b.id}:${slot}`, cv);
+        const sh = buildingShadow(b, cv);
+        if (sh) atlas.add(`bs:${b.id}:${slot}`, sh);
         this.canvases.set(`b:${b.id}:${slot}`, cv);
       }
     });

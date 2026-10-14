@@ -20,7 +20,7 @@ import { MatchArt } from '../assets/matchArt';
 import { BUILDING_OVERHANG } from '../assets/procedural/buildings';
 import { TILE_PX } from '../assets/tileset';
 import { ART_RES } from '../assets/procedural/draw';
-import { GROUND_PAD, GROUND_PX, paintGround, type GroundChunk } from '../terrain/ground';
+import { GROUND_PAD, GROUND_PX, WAVE_PX, paintGround, type GroundChunk } from '../terrain/ground';
 import { TreeLayer } from '../terrain/trees';
 import { Ambience } from '../effects/Ambience';
 import { CameraModel } from '../camera/CameraModel';
@@ -69,6 +69,14 @@ export class WorldScene extends Phaser.Scene {
   private fx!: EffectsRenderer;
   private minimap!: Minimap;
   private groundChunks: GroundChunk[] = [];
+  /** Animated water layers (two per watery chunk). */
+  private waves: Array<{
+    img: Phaser.GameObjects.Image;
+    x: number;
+    y: number;
+    k: number;
+    phase: number;
+  }> = [];
   /** Scene time of the last fight the player could see (drives the battle music). */
   private lastCombat = -1e9;
   private nextMinimapAt = 0;
@@ -148,7 +156,21 @@ export class WorldScene extends Phaser.Scene {
     const map = this.world.map;
     for (let i = 0; this.textures.exists(`ground_${i}`); i++) this.textures.remove(`ground_${i}`);
     this.groundChunks = paintGround(map);
+    this.waves = [];
     this.groundChunks.forEach((ch, i) => {
+      ch.waves?.forEach((wl, k) => {
+        const wk = `waves_${i}_${k}`;
+        if (this.textures.exists(wk)) this.textures.remove(wk);
+        this.textures.addCanvas(wk, wl.canvas)?.setFilter(Phaser.Textures.FilterMode.LINEAR);
+        const img = this.add
+          .image(wl.x * TILE_PX, wl.y * TILE_PX, wk)
+          .setOrigin(0, 0)
+          .setScale(TILE_PX / WAVE_PX)
+          .setDepth(-1.6)
+          .setBlendMode(Phaser.BlendModes.ADD)
+          .setAlpha(0);
+        this.waves.push({ img, x: img.x, y: img.y, k, phase: i * 1.7 });
+      });
       const key = `ground_${i}`;
       this.textures.addCanvas(key, ch.canvas)?.setFilter(Phaser.Textures.FilterMode.LINEAR);
       const k = TILE_PX / GROUND_PX;
@@ -193,6 +215,40 @@ export class WorldScene extends Phaser.Scene {
       this.camModel.setViewport(size.width, size.height);
     });
     this.applyCamera();
+    this.applyPostFX();
+  }
+
+  /**
+   * Screen-space polish (WebGL only): a warm, slightly richer colour grade on Medium/High and,
+   * on High, a gentle tilt-shift blur at the top and bottom edges for a miniature-diorama look.
+   */
+  private applyPostFX(): void {
+    const cam = this.cameras.main;
+    const q = this.ctx.settings.graphics;
+    if (this.renderer.type !== Phaser.WEBGL || !cam.postFX || q === 'low') return;
+    cam.postFX.clear();
+    const grade = cam.postFX.addColorMatrix();
+    grade.saturate(0.12);
+    grade.contrast(0.07, true);
+  }
+
+  /** Drift and cross-fade the two ripple layers of each watery chunk (only when on screen). */
+  private animateWater(time: number): void {
+    if (this.ctx.settings.graphics === 'low') return;
+    const view = this.cameras.main.worldView;
+    for (const w of this.waves) {
+      const vis =
+        w.x < view.right &&
+        w.x + w.img.displayWidth > view.x &&
+        w.y < view.bottom &&
+        w.y + w.img.displayHeight > view.y;
+      w.img.setVisible(vis);
+      if (!vis) continue;
+      const t = time * 0.0009 + w.phase;
+      const s = Math.sin(t + w.k * Math.PI);
+      w.img.setAlpha(0.12 + 0.24 * (0.5 + 0.5 * s));
+      w.img.setPosition(w.x + Math.sin(t * 0.7 + w.k) * 5, w.y + Math.cos(t * 0.5 + w.k) * 3);
+    }
   }
 
   /** Centre the camera on a tile position. */
@@ -866,6 +922,7 @@ export class WorldScene extends Phaser.Scene {
     }
     lap('mini');
     this.trees.update(this.cameras.main.worldView, time);
+    this.animateWater(time);
     this.ambience.update(dt, this.cameras.main.worldView, this.world.map);
     this.areaMotes(time);
     this.entities.update(
