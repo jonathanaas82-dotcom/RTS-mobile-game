@@ -138,8 +138,12 @@ export const TECHS: TechDef[] = [
   // God techs
   {
     id: 'rune_steel',
-    name: { en: 'Rune-Steel', nb: 'Runestål' },
-    desc: { en: 'Military damage +15%.', nb: 'Militær skade +15 %.' },
+    // Sigrdrífumál 6: carve victory runes on the sword hilt and name Týr twice.
+    name: { en: 'Victory Runes', nb: 'Seiersruner' },
+    desc: {
+      en: 'Sigrúnar carved on sword hilts, naming Týr twice. Military damage +15%.',
+      nb: 'Seiersruner risset på sverdhjaltet mens Ty nevnes to ganger. Militær skade +15 %.',
+    },
     cost: { food: 150, gold: 150 },
     researchTime: 35,
     age: 2,
@@ -149,8 +153,12 @@ export const TECHS: TechDef[] = [
   },
   {
     id: 'far_watch',
-    name: { en: 'Far-Watch', nb: 'Fjernvakt' },
-    desc: { en: 'Towers and Town Halls +2 range.', nb: 'Tårn og rådhus +2 rekkevidde.' },
+    // Himinbjörg: Heimdallr's hall by Bifröst, from which he keeps watch (Grímnismál 13).
+    name: { en: 'Himinbjörg Watch', nb: 'Himinbjørg-vakt' },
+    desc: {
+      en: "Keep watch like Heimdallr from his hall by Bifröst. Towers and Chieftain's Halls +2 range.",
+      nb: 'Hold vakt som Heimdall fra hallen ved Bifrost. Tårn og høvdinggårder +2 rekkevidde.',
+    },
     cost: { wood: 150, gold: 100 },
     researchTime: 30,
     age: 2,

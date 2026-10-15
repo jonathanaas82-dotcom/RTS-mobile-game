@@ -159,7 +159,7 @@ export const nb: Partial<Record<TranslationKey, string>> = {
   'stats.best': 'Raskeste seier',
   'stats.reset': 'Nullstill statistikk',
   'credits.body':
-    '{game} — et originalt mytologisk strategispill for mobil.\n\nDesign, kode og prosedyrisk plassholdergrafikk: laget for dette prosjektet.\nBygd med Phaser 3, TypeScript og Vite.\nAlle navn, folk, enheter og historier er originale; virkelig mytologi er bare løs inspirasjon.\n\nTakk for at du spiller!',
+    '{game} — et originalt mytologisk strategispill for mobil.\n\nDesign, kode og prosedyrisk plassholdergrafikk: laget for dette prosjektet.\nBygd med Phaser 3, TypeScript og Vite.\nDe norrøne og gudene deres bygger på historisk norrøn mytologi (Den eldre og Den yngre Edda) og vikingtiden; de andre folkene, gudene og enhetene er originale og bare løst inspirert av gresk og egyptisk mytologi.\n\nTakk for at du spiller!',
   'pause.settings': 'Innstillinger',
   'pause.surrender': 'Gi opp',
   'pause.quit': 'Avslutt til meny',
@@ -173,27 +173,29 @@ export const nb: Partial<Record<TranslationKey, string>> = {
   'tut.keepPlaying': 'Fortsett å spille',
   'tut.welcome':
     'Velkommen, høvding! Dra med én finger for å flytte kartet og knip med to fingre for å zoome. Trykk Neste når du er klar.',
-  'tut.select': 'Trykk på en av arbeiderne dine (de små figurene ved rådhuset) for å velge den.',
+  'tut.select':
+    'Trykk på en av arbeiderne dine (de små figurene ved høvdinggården) for å velge den.',
   'tut.house':
-    'Hus øker befolkningsgrensen. Med arbeideren valgt: trykk Bygg (nede til høyre), velg Hus, dra kartet for å plassere det og trykk ✓.',
+    'Langhus øker befolkningsgrensen. Med arbeideren valgt: trykk Bygg (nede til høyre), velg Langhus, dra kartet for å plassere det og trykk ✓.',
   'tut.houseWait':
-    'Arbeideren går bort og bygger huset. Send flere arbeidere for å bygge raskere: velg dem og trykk på grunnmuren.',
+    'Arbeideren går bort og bygger langhuset. Send flere arbeidere for å bygge raskere: velg dem og trykk på grunnmuren.',
   'tut.wood':
-    'Sank tre: velg en arbeider og trykk på en skog. Arbeiderne bærer ressursene tilbake til rådhuset av seg selv.',
+    'Sank tre: velg en arbeider og trykk på en skog. Arbeiderne bærer ressursene tilbake til hallen av seg selv.',
   'tut.train':
-    'Trykk på rådhuset og deretter på arbeiderportrettet for å trene en ny arbeider. Flere arbeidere gir sterkere økonomi.',
+    'Trykk på høvdinggården og deretter på arbeiderportrettet for å trene en ny arbeider. Flere arbeidere gir sterkere økonomi.',
   'tut.barracks':
-    'Bygg en kaserne på samme måte som huset. Hold inne en knapp for å se hva den gjør.',
+    'Bygg en kaserne på samme måte som langhuset. Hold inne en knapp for å se hva den gjør.',
   'tut.army':
     'Velg kasernen og tren tre soldater. ▲ ▼ i valgpanelet viser hva hver enhet er sterk og svak mot.',
   'tut.fight':
     'Plyndrere nærmer seg! Trykk hærknappen (til venstre) for å velge alle soldatene, og trykk så på en fiende for å angripe.',
   'tut.age':
-    'Seier! Gå nå videre til klassisk tid: velg rådhuset, trykk på stjernen og velg en gud. Hver gud gir en bonus, en gudekraft og et mytisk vesen.',
+    'Seier! Gå nå videre til klassisk tid: velg høvdinggården, trykk på stjernen og velg en gud. Hver gud gir en bonus, en gudekraft og et mytisk vesen.',
   'tut.done':
     'Bra jobbet! Du kan det grunnleggende: sanke, bygge, trene, kjempe og gå videre. Bruk gudekrefter (øverst) med gunst, og ødelegg fiendens rådhus for å vinne.',
   'cmd.shelter': 'Søk ly',
-  'cmd.shelterHint': 'Søk ly i nærmeste rådhus eller tårn (hver enhet gir 20 % mer pileskade)',
+  'cmd.shelterHint':
+    'Søk ly i nærmeste hovedbygning eller tårn (hver enhet gir 20 % mer pileskade)',
   'cmd.release': 'Slipp ut',
   'sel.sheltered': 'I ly {n}/{cap}',
   'order.garrison': 'Søker ly',

@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { buildingDef, factionDef, godDef, loc, powerDef, techDef } from '../../data';
+import { buildingDef, buildingName, factionDef, godDef, loc, powerDef, techDef } from '../../data';
 import { AGES } from '../../data/factions';
 import { SIM, TICK_MS } from '../../data/balance/sim';
 import { getLanguage, t, type TranslationKey } from '../../i18n';
@@ -872,7 +872,9 @@ export class WorldScene extends Phaser.Scene {
         }
         if (ev.owner === ME)
           this.ctx.hud.showInfo(
-            t('ev.built', { name: loc(buildingDef(ev.def).name, getLanguage()) }),
+            t('ev.built', {
+              name: loc(buildingName(ev.def, this.world.players[ME]?.faction), getLanguage()),
+            }),
           );
       } else if (
         ev.type === 'trained' &&
@@ -883,7 +885,9 @@ export class WorldScene extends Phaser.Scene {
         this.fx.motes(u.x * TILE_PX, u.y * TILE_PX, 0xfff3b0, 8);
       } else if (ev.type === 'built' && ev.owner === ME) {
         this.ctx.hud.showInfo(
-          t('ev.built', { name: loc(buildingDef(ev.def).name, getLanguage()) }),
+          t('ev.built', {
+            name: loc(buildingName(ev.def, this.world.players[ME]?.faction), getLanguage()),
+          }),
         );
       } else if (ev.type === 'researched' && ev.owner === ME) {
         this.ctx.hud.showInfo(

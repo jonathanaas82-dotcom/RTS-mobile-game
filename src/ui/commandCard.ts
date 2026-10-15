@@ -1,4 +1,4 @@
-import { buildingDef, loc, powerDef, techDef, unitDef } from '../data';
+import { buildingDef, buildingName, loc, powerDef, techDef, unitDef } from '../data';
 import { AGES } from '../data/factions';
 import { strongAgainst, weakAgainst } from '../data/counters';
 import type { ResourceKind } from '../data/balance/economy';
@@ -135,7 +135,7 @@ export class CommandCard {
           detail = (detail ? `${detail} · ` : '') + t('sel.sheltered', { n: inside, cap });
       }
       return {
-        title: loc(d.name, lang),
+        title: loc(buildingName(d, world.players[e.owner]?.faction), lang),
         subtitle: e.owner === this.host.me ? undefined : t('sel.enemy'),
         icon: this.host.icon(frameOf(e)),
         hp: [e.hp, e.maxHp],
@@ -208,10 +208,10 @@ export class CommandCard {
           out.push({
             id: `build:${b.id}`,
             icon: this.host.icon(`b:${b.id}:${me}`),
-            label: loc(b.name, lang),
+            label: loc(buildingName(b, p.faction), lang),
             cost,
             disabled: !chk.ok,
-            hint: `${loc(b.name, lang)} — ${costText(cost)}${chk.ok ? '' : ` · ${denialText(chk)}`}${chk.reason === 'age' ? ` (${loc(AGES[b.age]!.name, lang)})` : ''}`,
+            hint: `${loc(buildingName(b, p.faction), lang)} —${costText(cost)}${chk.ok ? '' : ` · ${denialText(chk)}`}${chk.reason === 'age' ? ` (${loc(AGES[b.age]!.name, lang)})` : ''}`,
             onPress: () => {
               this.page = 'main';
               this.host.startPlacement(b.id);

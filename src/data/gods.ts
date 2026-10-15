@@ -1,40 +1,47 @@
 import type { GodDef } from './types';
 
 /**
- * Gods (all names original). age 0 = major god chosen at match start; ages 1–3 = minor gods
- * offered in pairs when advancing to Classical, Heroic and Mythic.
+ * Gods. age 0 = major god chosen at match start; ages 1–3 = minor gods offered in pairs when
+ * advancing to Classical, Heroic and Mythic. The Norsemen worship the historical Norse gods
+ * (Poetic and Prose Edda, public domain); the other factions' names are original.
  */
 export const GODS: GodDef[] = [
-  // ───────────── Hrimfolk ─────────────
+  // ───────────── Norsemen (ids kept from the old "Hrimfolk" data) ─────────────
   {
     id: 'thunrak',
-    name: { en: 'Thunrak' },
-    title: { en: 'the Storm-Father', nb: 'Stormfaderen' },
+    name: { en: 'Thor (Þórr)', nb: 'Tor' },
+    title: { en: 'the Thunderer', nb: 'Tordenguden' },
     faction: 'hrimfolk',
     age: 0,
-    desc: { en: 'Infantry +12% damage.', nb: 'Infanteri +12 % skade.' },
+    desc: {
+      en: 'Wielder of Mjölnir, protector of Midgard and of common folk. Infantry +12% damage.',
+      nb: 'Bærer av Mjølner, vokter av Midgard og vanlige folk. Infanteri +12 % skade.',
+    },
     bonuses: [{ stat: 'damage', mul: 1.12, classes: ['infantry'] }],
     power: 'skyhammer',
   },
   {
     id: 'veyla',
-    name: { en: 'Veyla' },
-    title: { en: 'the Winter Queen', nb: 'Vinterdronningen' },
+    name: { en: 'Odin (Óðinn)', nb: 'Odin' },
+    title: { en: 'the Allfather', nb: 'Allfaderen' },
     faction: 'hrimfolk',
     age: 0,
-    desc: { en: 'Mythic units cost 15% less.', nb: 'Mytiske enheter koster 15 % mindre.' },
+    desc: {
+      en: 'Lord of the Æsir and the Nine Worlds, whose beings heed his call. Mythic units cost 15% less.',
+      nb: 'Herre over æsene og de ni verdener, der vesenene lyder hans kall. Mytiske enheter koster 15 % mindre.',
+    },
     bonuses: [{ stat: 'cost', mul: 0.85, classes: ['mythic'] }],
     power: 'whiteout',
   },
   {
     id: 'hrodna',
-    name: { en: 'Hrodna' },
-    title: { en: 'Mother of Frost', nb: 'Frostens mor' },
+    name: { en: 'Skaði', nb: 'Skade' },
+    title: { en: 'the Ski Goddess', nb: 'Skigudinnen' },
     faction: 'hrimfolk',
     age: 1,
     desc: {
-      en: 'Workers +20% hit points. Unlocks the Rimehulk.',
-      nb: 'Arbeidere +20 % liv. Låser opp Rimkoloss.',
+      en: 'Giantess of the snowy mountains, daughter of Þjazi. Workers +20% hit points. Unlocks the Frost Giant.',
+      nb: 'Jotunkvinne fra de snødekte fjellene, Tjatses datter. Arbeidere +20 % liv. Låser opp Rimtusse.',
     },
     bonuses: [{ stat: 'hp', mul: 1.2, classes: ['worker'] }],
     power: 'frostbite',
@@ -42,13 +49,13 @@ export const GODS: GodDef[] = [
   },
   {
     id: 'skarn',
-    name: { en: 'Skarn' },
-    title: { en: 'the Hunter', nb: 'Jegeren' },
+    name: { en: 'Ullr', nb: 'Ull' },
+    title: { en: 'the Hunter on Skis', nb: 'Jegeren på ski' },
     faction: 'hrimfolk',
     age: 1,
     desc: {
-      en: 'Cavalry +10% speed. Unlocks the Fenwyrm.',
-      nb: 'Kavaleri +10 % fart. Låser opp Myrorm.',
+      en: 'Archer and ski-runner so swift that none can match him. Cavalry +10% speed. Unlocks the Lindworm.',
+      nb: 'Bueskytter og skiløper så rask at ingen kan måle seg med ham. Kavaleri +10 % fart. Låser opp Lindorm.',
     },
     bonuses: [{ stat: 'speed', mul: 1.1, classes: ['cavalry'] }],
     power: 'wild_hunt',
@@ -56,13 +63,13 @@ export const GODS: GodDef[] = [
   },
   {
     id: 'brakka',
-    name: { en: 'Brakka' },
-    title: { en: 'of the Forge', nb: 'av smia' },
+    name: { en: 'Týr', nb: 'Ty' },
+    title: { en: 'the One-Handed', nb: 'den enhendte' },
     faction: 'hrimfolk',
     age: 2,
     desc: {
-      en: 'Unlocks Rune-Steel (+15% military damage).',
-      nb: 'Låser opp Runestål (+15 % militær skade).',
+      en: 'God of war and oaths; gave his hand to bind Fenrir. Siege +10% hit points. Unlocks Victory Runes (+15% military damage).',
+      nb: 'Krigens og edenes gud; ofret hånden for å binde Fenrisulven. Beleiring +10 % liv. Låser opp Seiersruner (+15 % militær skade).',
     },
     bonuses: [{ stat: 'hp', mul: 1.1, classes: ['siege'] }],
     power: 'forgefire',
@@ -70,13 +77,13 @@ export const GODS: GodDef[] = [
   },
   {
     id: 'eldra',
-    name: { en: 'Eldra' },
-    title: { en: 'the Seer', nb: 'Seersken' },
+    name: { en: 'Heimdallr', nb: 'Heimdall' },
+    title: { en: 'Watchman of the Gods', nb: 'Gudenes vaktmann' },
     faction: 'hrimfolk',
     age: 2,
     desc: {
-      en: 'All units +2 sight. Unlocks Far-Watch (towers +2 range).',
-      nb: 'Alle enheter +2 syn. Låser opp Fjernvakt (tårn +2 rekkevidde).',
+      en: 'Guards Bifröst and can hear the grass grow. All units +2 sight. Unlocks Himinbjörg Watch (towers +2 range).',
+      nb: 'Vokter Bifrost og kan høre gresset gro. Alle enheter +2 syn. Låser opp Himinbjørg-vakt (tårn +2 rekkevidde).',
     },
     bonuses: [{ stat: 'sight', add: 2 }],
     power: 'farsight',
@@ -84,13 +91,13 @@ export const GODS: GodDef[] = [
   },
   {
     id: 'gorm',
-    name: { en: 'Gorm' },
-    title: { en: 'the Undying', nb: 'den Udødelige' },
+    name: { en: 'Hel', nb: 'Hel' },
+    title: { en: 'Ruler of Helheim', nb: 'Helheims herskerinne' },
     faction: 'hrimfolk',
     age: 3,
     desc: {
-      en: 'Infantry +15% hit points. Unlocks the Bale Wolf.',
-      nb: 'Infanteri +15 % liv. Låser opp Baleulv.',
+      en: "Loki's daughter and Fenrir's sister, keeper of the dead. Infantry +15% hit points. Unlocks the Ironwood Wolf.",
+      nb: 'Lokes datter og Fenrisulvens søster, de dødes vokter. Infanteri +15 % liv. Låser opp Jarnvidulv.',
     },
     bonuses: [{ stat: 'hp', mul: 1.15, classes: ['infantry'] }],
     power: 'restless_dead',
@@ -98,13 +105,13 @@ export const GODS: GodDef[] = [
   },
   {
     id: 'sigrun',
-    name: { en: 'Sigrun' },
-    title: { en: 'Stormcaller', nb: 'Stormkaller' },
+    name: { en: 'Freyja', nb: 'Frøya' },
+    title: { en: 'Lady of Fólkvangr', nb: 'Folkvangs frue' },
     faction: 'hrimfolk',
     age: 3,
     desc: {
-      en: 'Heroes +20% damage. Unlocks the Cinder Colossus.',
-      nb: 'Helter +20 % skade. Låser opp Askekoloss.',
+      en: 'Rides to battle and chooses half the slain for her hall. Heroes +20% damage. Unlocks the Fire Giant.',
+      nb: 'Rir til strid og velger halvparten av de falne til sin hall. Helter +20 % skade. Låser opp Ildjotun.',
     },
     bonuses: [{ stat: 'damage', mul: 1.2, classes: ['hero'] }],
     power: 'tempest',

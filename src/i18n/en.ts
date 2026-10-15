@@ -157,7 +157,7 @@ export const en = {
   'stats.best': 'Fastest victory',
   'stats.reset': 'Reset statistics',
   'credits.body':
-    '{game} — an original mobile mythology RTS.\n\nDesign, code and procedural placeholder art: generated for this project.\nBuilt with Phaser 3, TypeScript and Vite.\nAll names, factions, units and lore are original; real-world mythology served only as loose inspiration.\n\nThank you for playing!',
+    '{game} — an original mobile mythology RTS.\n\nDesign, code and procedural placeholder art: generated for this project.\nBuilt with Phaser 3, TypeScript and Vite.\nThe Norsemen and their gods are drawn from historical Norse mythology (the Poetic and Prose Edda) and the Viking Age; the other factions, their gods and units are original creations loosely inspired by Greek and Egyptian myth.\n\nThank you for playing!',
   'pause.settings': 'Settings',
   'pause.surrender': 'Surrender',
   'pause.quit': 'Quit to menu',
@@ -171,27 +171,28 @@ export const en = {
   'tut.keepPlaying': 'Keep playing',
   'tut.welcome':
     'Welcome, chieftain! Drag one finger to move the map and pinch with two fingers to zoom. Tap Next when ready.',
-  'tut.select': 'Tap one of your workers (the small figures near your Town Hall) to select it.',
+  'tut.select':
+    "Tap one of your workers (the small figures near your Chieftain's Hall) to select it.",
   'tut.house':
-    'Houses raise your population limit. With the worker selected, tap Build (bottom right), choose House, drag the map to position it, then tap ✓.',
+    'Longhouses raise your population limit. With the worker selected, tap Build (bottom right), choose Longhouse, drag the map to position it, then tap ✓.',
   'tut.houseWait':
-    'Your worker walks over and builds the house. You can speed this up by sending more workers: select them and tap the foundation.',
+    'Your worker walks over and builds the longhouse. You can speed this up by sending more workers: select them and tap the foundation.',
   'tut.wood':
-    'Now gather wood: select a worker and tap a forest. Workers carry resources back to the Town Hall automatically.',
+    'Now gather wood: select a worker and tap a forest. Workers carry resources back to the hall automatically.',
   'tut.train':
-    'Tap your Town Hall, then tap the worker portrait to train a new worker. More workers mean a stronger economy.',
+    "Tap your Chieftain's Hall, then tap the worker portrait to train a new worker. More workers mean a stronger economy.",
   'tut.barracks':
-    'Build a Barracks the same way you built the house. Long-press any button to see what it does.',
+    'Build a Barracks the same way you built the longhouse. Long-press any button to see what it does.',
   'tut.army':
     'Select the Barracks and train three soldiers. The ▲ ▼ hints in the selection panel show what each unit is strong and weak against.',
   'tut.fight':
     'Raiders approach! Tap the army button (left) to select all soldiers, then tap an enemy to attack.',
   'tut.age':
-    'Victory! Now advance to the Classical Age: select the Town Hall, tap the star and choose a god. Each god grants a bonus, a god power and a mythic creature.',
+    "Victory! Now advance to the Classical Age: select the Chieftain's Hall, tap the star and choose a god. Each god grants a bonus, a god power and a mythic creature.",
   'tut.done':
     'Well done! You know the basics: gather, build, train, fight and advance. Use god powers (top) with Favor, and destroy the enemy Town Hall to win.',
   'cmd.shelter': 'Shelter',
-  'cmd.shelterHint': 'Shelter in the nearest Town Hall or tower (each unit adds 20% arrow damage)',
+  'cmd.shelterHint': 'Shelter in the nearest main hall or tower (each unit adds 20% arrow damage)',
   'cmd.release': 'Release sheltered units',
   'sel.sheltered': 'Sheltered {n}/{cap}',
   'order.garrison': 'Taking shelter',

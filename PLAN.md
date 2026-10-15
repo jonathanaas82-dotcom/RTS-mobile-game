@@ -2,8 +2,10 @@
 
 Working title **Godforge** (change it in `src/config/game.ts` and `public/manifest.webmanifest`).
 
-A mobile-first, landscape, touch-only mythology RTS. All names, factions, units and lore below are
-original; real-world mythology is used only as loose public-domain inspiration.
+A mobile-first, landscape, touch-only mythology RTS. The Norsemen are based on historical Norse
+mythology (Poetic and Prose Edda, public domain) and Viking Age history, with Old Norse names. The
+Aurelian League and Sahrun Dominion use original names, with real-world mythology as loose
+inspiration only.
 
 ## Milestones
 
@@ -78,35 +80,39 @@ viewport with touch emulation, screenshot in `e2e-output/`), then a git commit.
 - **Hard AI** gets an explicit **+15% gather rate** bonus (shown on the pre-match screen); Easy/Normal
   get none.
 
-### Factions (original names)
+### Factions
+
+The Norsemen keep the internal id `hrimfolk` (and their old unit/god ids) so saves, AI and art
+stay valid; only display names changed.
 
 | Faction                                                 | Flavour                                     | Favor income                                          | Unique mechanics                                                                       |
 | ------------------------------------------------------- | ------------------------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| **The Hrimfolk** (northern, Norse-inspired)             | Cheap, tough infantry; aggressive           | Dealing/taking damage in combat                       | _Warhorn_: nearby infantry gain attack speed after a kill; builders are also soldiers. |
+| **The Norsemen** (Viking Age, historical Norse myth)    | Cheap, tough infantry; aggressive           | Dealing/taking damage in combat                       | _Warhorn_: nearby infantry gain attack speed after a kill; builders are also soldiers. |
 | **The Aurelian League** (Mediterranean, Greek-inspired) | Balanced; strongest heroes                  | Shrines generate Favor, more with garrisoned acolytes | Heroes level up from kills; extra hero slot per age.                                   |
 | **The Sahrun Dominion** (desert, Egyptian-inspired)     | Strong economy and buildings; slow military | Monuments (5 tiers) generate Favor passively          | _Sun Obelisks_ extend build radius and boost nearby gathering; buildings +25% HP.      |
 
 Major gods (pick one at match start, 2 per faction to start, data-driven to add more):
 
-- Hrimfolk: **Thunrak the Storm-Father** (infantry attack, power: _Skyhammer_ lightning strike),
-  **Veyla the Winter Queen** (cheaper mythic units, power: _Whiteout_ freezes an area).
+- Norsemen: **Thor (Þórr) the Thunderer** (infantry attack, power: _Mjölnir's Wrath_ lightning
+  strike), **Odin (Óðinn) the Allfather** (cheaper mythic units, power: _War-Fetter_ freezes an
+  area). Minor gods: Skaði, Ullr (Classical); Týr, Heimdallr (Heroic); Hel, Freyja (Mythic).
 - Aurelian: **Aetheon, Lord of the High Air** (hero HP/regeneration, power: _Radiant Ward_ heal zone),
   **Thalassine of the Tides** (faster economy and ships, power: _Tidal Surge_ knockback wave).
 - Sahrun: **Solenkh the Radiant** (cheaper buildings, power: _Sunfire Lens_ burning beam),
   **Merit-Asha the Veiled** (stronger monuments, power: _Sandstorm Veil_ hides units / slows enemies).
 
-Example units (full lists live in `src/data`): Hrimfolk _Hearthkin_ (worker), _Shieldbrother_
-(infantry), _Ravenbow_ (ranged), _Wolfrider_ (cavalry), _Frostram_ (siege), hero _Stormsworn_, mythic
-_Rimehulk_ and _Fenwyrm_. Aurelian _Citizen_, _Bronzeguard_, _Slinger_, _Lancer_, _Torsion Engine_,
+Example units (full lists live in `src/data`): Norsemen _Bóndi_ (worker), _Húskarl_ (infantry),
+_Bowman_ (ranged), _Hird Rider_ (cavalry), _Battering Ram_ (siege), hero _Jarl_, mythic _Frost
+Giant_ (hrímþurs) and _Lindworm_. Aurelian _Citizen_, _Bronzeguard_, _Slinger_, _Lancer_, _Torsion Engine_,
 hero _Lionheart Paragon_, mythic _Gorgonath_ and _Hydrake_. Sahrun _Toiler_, _Khopesh Guard_, _Sandbow_,
 _Dune Chariot_, _Sun Lens_, hero _Sun-Priest_, mythic _Scarab Colossus_ and _Jackal Sentinel_.
 
 ## Balance notes (M8)
 
 Tuned with `npm run balance` (Normal AI vs Normal AI, 3 seeds × 3 matchups). Latest report: wins
-Hrimfolk 3 · Aurelian 2 · Sahrun 3, one AI-vs-AI stalemate; decisive games last 23–36 game-minutes
+Norsemen 3 · Aurelian 2 · Sahrun 3, one AI-vs-AI stalemate; decisive games last 23–36 game-minutes
 between two cautious AIs (human-vs-AI games are shorter; the Hard AI beats Easy in ~20).
-Changes made during the pass: Hrimfolk favor from combat +67% and sturdier workers/infantry;
+Changes made during the pass: Norsemen favor from combat +67% and sturdier workers/infantry;
 Aurelian hero, shrine and Lancer nerfs and Slingers now cost some gold; Sahrun faster training and
 stronger infantry/chariots; cheaper Heroic and Mythic ages; +10% gather rates; more gold on maps;
 shelter arrows +20% per unit; the AI scouts for distant gold, mines it with storehouses, and

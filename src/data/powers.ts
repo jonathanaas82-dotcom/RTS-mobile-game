@@ -2,13 +2,13 @@ import type { PowerDef } from './types';
 
 /** God powers. Cast by spending Favor; each has a cooldown. Radius 0 = no target needed. */
 export const POWERS: PowerDef[] = [
-  // Hrimfolk
+  // Norsemen (faction id 'hrimfolk')
   {
     id: 'skyhammer',
-    name: { en: 'Skyhammer', nb: 'Himmelhammer' },
+    name: { en: "Mjölnir's Wrath", nb: 'Mjølners vrede' },
     desc: {
-      en: 'Lightning strikes an area, heavily damaging enemies.',
-      nb: 'Lyn slår ned og gjør stor skade på fiender.',
+      en: 'Thor hurls Mjölnir: lightning strikes an area, heavily damaging enemies.',
+      nb: 'Tor slynger Mjølner: lyn slår ned og gjør stor skade på fiender.',
     },
     kind: 'strike',
     favorCost: 25,
@@ -20,8 +20,11 @@ export const POWERS: PowerDef[] = [
   },
   {
     id: 'whiteout',
-    name: { en: 'Whiteout', nb: 'Snøstorm' },
-    desc: { en: 'Freezes all enemies in an area.', nb: 'Fryser alle fiender i et område.' },
+    name: { en: 'War-Fetter', nb: 'Herfjotur' },
+    desc: {
+      en: 'Odin binds the foe in herfjöturr, the war-fetter of panic: freezes all enemies in an area.',
+      nb: 'Odin binder fienden med kamplammelse: fryser alle fiender i et område.',
+    },
     kind: 'freeze',
     favorCost: 25,
     cooldown: 100,
@@ -31,10 +34,10 @@ export const POWERS: PowerDef[] = [
   },
   {
     id: 'frostbite',
-    name: { en: 'Frostbite', nb: 'Frostbitt' },
+    name: { en: 'Frost of Þrymheimr', nb: 'Trymheimfrost' },
     desc: {
-      en: 'Enemies in the area are slowed and take cold damage.',
-      nb: 'Fiender i området bremses og tar kuldeskade.',
+      en: "Winter wind from Skaði's mountain home: enemies in the area are slowed and take cold damage.",
+      nb: 'Vinterkulde fra Skades fjellheim: fiender i området bremses og tar kuldeskade.',
     },
     kind: 'dot',
     favorCost: 20,
@@ -47,10 +50,10 @@ export const POWERS: PowerDef[] = [
   },
   {
     id: 'wild_hunt',
-    name: { en: 'Wild Hunt', nb: 'Den ville jakt' },
+    name: { en: 'The Wild Hunt', nb: 'Oskoreia' },
     desc: {
-      en: 'Summons a pack of Wolfriders for 45 seconds.',
-      nb: 'Kaller frem Ulverryttere i 45 sekunder.',
+      en: 'The Wild Hunt (Oskoreia) rides out of the winter night: summons Hird Riders for 45 seconds.',
+      nb: 'Oskoreia farer gjennom vinternatten: kaller frem hirdryttere i 45 sekunder.',
     },
     kind: 'summon',
     favorCost: 30,
@@ -63,10 +66,10 @@ export const POWERS: PowerDef[] = [
   },
   {
     id: 'forgefire',
-    name: { en: 'Forgefire', nb: 'Smieild' },
+    name: { en: 'The Levy', nb: 'Leidang' },
     desc: {
-      en: 'For 40 s, units train and buildings build twice as fast.',
-      nb: 'I 40 s trenes enheter og bygninger bygges dobbelt så raskt.',
+      en: 'The leiðangr (levy) is called out: for 40 s, units train and buildings build twice as fast.',
+      nb: 'Leidangen kalles ut: i 40 s trenes enheter og bygninger bygges dobbelt så raskt.',
     },
     kind: 'boost',
     favorCost: 25,
@@ -81,10 +84,10 @@ export const POWERS: PowerDef[] = [
   },
   {
     id: 'farsight',
-    name: { en: 'Farsight', nb: 'Fjernsyn' },
+    name: { en: "Heimdall's Vigil", nb: 'Heimdalls vakt' },
     desc: {
-      en: 'Reveals a large area for 30 seconds.',
-      nb: 'Avslører et stort område i 30 sekunder.',
+      en: "Heimdallr's eyes pierce the dark: reveals a large area for 30 seconds.",
+      nb: 'Heimdalls blikk gjennomborer mørket: avslører et stort område i 30 sekunder.',
     },
     kind: 'reveal',
     favorCost: 10,
@@ -95,10 +98,10 @@ export const POWERS: PowerDef[] = [
   },
   {
     id: 'restless_dead',
-    name: { en: 'Restless Dead', nb: 'De rastløse døde' },
+    name: { en: 'Rise of the Draugar', nb: 'Draugene våkner' },
     desc: {
-      en: 'Raises Shieldbrothers from the earth for 60 seconds.',
-      nb: 'Reiser Skjoldbrødre fra jorden i 60 sekunder.',
+      en: 'Draugar rise from their burial mounds: raises Húskarlar for 60 seconds.',
+      nb: 'Drauger stiger opp av gravhaugene: reiser huskarler i 60 sekunder.',
     },
     kind: 'summon',
     favorCost: 35,
@@ -111,10 +114,10 @@ export const POWERS: PowerDef[] = [
   },
   {
     id: 'tempest',
-    name: { en: 'Tempest', nb: 'Uvær' },
+    name: { en: 'Ride of the Valkyries', nb: 'Valkyrjeritt' },
     desc: {
-      en: 'A raging storm damages everything hostile in a wide area.',
-      nb: 'En rasende storm skader alt fiendtlig i et stort område.',
+      en: 'Valkyries ride the storm, lightning flashing from their spears: damages everything hostile in a wide area.',
+      nb: 'Valkyrjene rir i stormen med lyn fra spydene: skader alt fiendtlig i et stort område.',
     },
     kind: 'dot',
     favorCost: 40,
