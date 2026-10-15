@@ -246,3 +246,19 @@ export function sunlight(fig: HTMLCanvasElement, baseY: number, rim = 2.2, fromL
   c.drawImage(edge, 0, 0);
   c.restore();
 }
+
+/**
+ * Like `createCanvas`, but with a CPU-backed context (`willReadFrequently`). Much faster when a
+ * sprite is built from thousands of small paths, which GPU canvases rasterise one by one.
+ */
+export function createSoftCanvas(
+  w: number,
+  h: number,
+): [HTMLCanvasElement, CanvasRenderingContext2D] {
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  if (!ctx) throw new Error('2D canvas not supported');
+  return [c, ctx];
+}
