@@ -59,6 +59,11 @@ Mouse works too (drag, click, wheel to zoom).
 
 ## Deploying as a PWA
 
+**GitHub Pages (automatic):** `.github/workflows/pages.yml` builds and publishes the game on
+every push. One-time setup: repo **Settings → Pages → Source: GitHub Actions** (Pages on a private
+repo needs a paid GitHub plan; otherwise make the repo public). The game is then served at
+`https://<user>.github.io/RTS-mobile-game/`.
+
 `npm run build` produces a static site in `dist/` with relative paths, so it can be hosted from
 any folder on any static HTTPS host (GitHub Pages, Netlify, Cloudflare Pages, S3…). Just upload
 `dist/`. Each build gets a new cache name, so players get updates on the next launch.
