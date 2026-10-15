@@ -43,8 +43,10 @@ Status legend: ✅ done in this repo · ⬜ needs a person/account/device · ⚠
 
 ## Content & legal
 
-- ✅ All names, factions, units, gods, art, sounds and text are original; real mythology is only
-  loose public-domain inspiration (see `PLAN.md`). No third-party assets.
+- ✅ Art, sounds and text are original. The Norsemen faction uses historical Norse mythology and
+  Viking Age history (gods and beings from the Poetic and Prose Edda, which are public domain);
+  the Aurelian and Sahrun names, gods and units are original, loosely inspired by Greek and
+  Egyptian myth (see `PLAN.md`). No third-party assets.
 - ✅ Credits screen in the game.
 - ✅ Dependencies are permissively licensed (Phaser MIT, Capacitor MIT). ⬜ Generate a license
   notice file if the store reviewer asks (`npx license-checker --production`).

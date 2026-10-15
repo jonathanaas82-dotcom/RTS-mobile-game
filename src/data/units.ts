@@ -7,10 +7,10 @@ import type { UnitDef } from './types';
 const MELEE = 0.35;
 
 export const UNITS: UnitDef[] = [
-  // ───────────── Hrimfolk (north): cheap, tough infantry ─────────────
+  // ───────── Norsemen (faction id 'hrimfolk'; Viking Age): cheap, tough infantry ─────────
   {
     id: 'hearthkin',
-    name: { en: 'Hearthkin', nb: 'Ildstedfolk' },
+    name: { en: 'Bóndi', nb: 'Bonde' },
     faction: 'hrimfolk',
     cls: 'worker',
     hp: 60,
@@ -28,8 +28,8 @@ export const UNITS: UnitDef[] = [
     carry: 10,
     buildRate: 1,
     role: {
-      en: 'Worker: gathers, builds and fights in a pinch.',
-      nb: 'Arbeider: samler, bygger og slåss om nødvendig.',
+      en: 'Worker: a free farmer who gathers and builds; the law bade every free man own weapons.',
+      nb: 'Arbeider: fri bonde som sanker og bygger; loven påla alle frie menn å eie våpen.',
     },
     art: {
       shape: 'humanoid',
@@ -42,7 +42,7 @@ export const UNITS: UnitDef[] = [
   },
   {
     id: 'shieldbrother',
-    name: { en: 'Shieldbrother', nb: 'Skjoldbror' },
+    name: { en: 'Húskarl', nb: 'Huskarl' },
     faction: 'hrimfolk',
     cls: 'infantry',
     hp: 130,
@@ -57,7 +57,10 @@ export const UNITS: UnitDef[] = [
     age: 0,
     trainedAt: 'barracks',
     traits: ['shieldwall'],
-    role: { en: 'Line infantry that shrugs off arrows.', nb: 'Linjeinfanteri som tåler piler.' },
+    role: {
+      en: 'Sworn household warrior of a jarl; locks shields into the skjaldborg (shield-wall).',
+      nb: 'Edsvoren hirdkriger hos en jarl; låser skjoldene sammen i skjoldborg.',
+    },
     art: {
       shape: 'humanoid',
       weapon: 'axe',
@@ -70,7 +73,7 @@ export const UNITS: UnitDef[] = [
   },
   {
     id: 'ravenbow',
-    name: { en: 'Ravenbow', nb: 'Ravnebue' },
+    name: { en: 'Bowman', nb: 'Bueskytter' },
     faction: 'hrimfolk',
     cls: 'ranged',
     hp: 70,
@@ -85,7 +88,10 @@ export const UNITS: UnitDef[] = [
     age: 0,
     trainedAt: 'barracks',
     traits: ['piercing'],
-    role: { en: 'Archer with heavy bodkin arrows.', nb: 'Bueskytter med tunge piler.' },
+    role: {
+      en: 'Archer with a yew bow; slim Viking arrowheads were made to pierce mail.',
+      nb: 'Bueskytter med barlindbue; de smale pilspissene var laget for å gå gjennom brynje.',
+    },
     art: {
       shape: 'humanoid',
       weapon: 'bow',
@@ -97,7 +103,7 @@ export const UNITS: UnitDef[] = [
   },
   {
     id: 'spearwarden',
-    name: { en: 'Spearwarden', nb: 'Spydvokter' },
+    name: { en: 'Spearman', nb: 'Spydmann' },
     faction: 'hrimfolk',
     cls: 'infantry',
     hp: 105,
@@ -113,8 +119,8 @@ export const UNITS: UnitDef[] = [
     trainedAt: 'barracks',
     traits: ['brace'],
     role: {
-      en: 'Spear infantry that stops cavalry cold.',
-      nb: 'Spydinfanteri som stopper kavaleri.',
+      en: 'The spear was the commonest Viking weapon; a braced spear stops cavalry cold.',
+      nb: 'Spydet var vikingenes vanligste våpen; et spyd satt mot bakken stopper kavaleri.',
     },
     art: {
       shape: 'humanoid',
@@ -128,7 +134,7 @@ export const UNITS: UnitDef[] = [
   },
   {
     id: 'wildheart',
-    name: { en: 'Wildheart', nb: 'Villhjerte' },
+    name: { en: 'Berserker', nb: 'Berserk' },
     faction: 'hrimfolk',
     cls: 'infantry',
     hp: 135,
@@ -144,8 +150,8 @@ export const UNITS: UnitDef[] = [
     trainedAt: 'barracks',
     traits: ['frenzy'],
     role: {
-      en: 'Berserker who fights harder the more he bleeds.',
-      nb: 'Bærsærk som slåss hardere jo mer han blør.',
+      en: "Berserkr or wolf-skinned úlfheðinn: Odin's warriors fought in a trance, wilder the more they bled.",
+      nb: 'Berserk eller ulvhedin i ulveskinn: Odins krigere kjempet i transe, villere jo mer de blødde.',
     },
     art: {
       shape: 'humanoid',
@@ -175,15 +181,16 @@ export const UNITS: UnitDef[] = [
     trainedAt: 'barracks',
     traits: ['inspire'],
     role: {
-      en: 'Battle-horn that spurs nearby warriors on.',
-      nb: 'Krigshorn som egger krigerne i nærheten.',
+      en: 'Sounds the war-horn (lúðr) that rallies and spurs on nearby warriors.',
+      nb: 'Blåser i krigshornet (lur) som samler og egger krigerne i nærheten.',
     },
     art: {
       shape: 'humanoid',
       weapon: 'horn',
       body: '#9a8060',
       accent: '#c9a24a',
-      helm: 'horned',
+      // Viking helmets had no horns (cf. the Gjermundbu find): nasal helm for accuracy.
+      helm: 'nasal',
       armor: 'mail',
       shield: 'none',
       cape: true,
@@ -192,7 +199,7 @@ export const UNITS: UnitDef[] = [
 
   {
     id: 'wolfrider',
-    name: { en: 'Wolfrider', nb: 'Ulverytter' },
+    name: { en: 'Hird Rider', nb: 'Hirdrytter' },
     faction: 'hrimfolk',
     cls: 'cavalry',
     hp: 150,
@@ -208,14 +215,15 @@ export const UNITS: UnitDef[] = [
     trainedAt: 'stable',
     traits: ['charge'],
     role: {
-      en: 'Shock cavalry that hits hardest on the first blow.',
-      nb: 'Sjokk-kavaleri som treffer hardest i første slag.',
+      en: "Mounted retainer of a lord's hirð, riding to war; hits hardest on the first blow.",
+      nb: 'Ridende hirdmann i en høvdings hird; treffer hardest i første støt.',
     },
-    art: { shape: 'rider', weapon: 'spear', body: '#8e8f96', accent: '#5a4632' },
+    // Vikings rode horses to war (no wolf mounts in history or saga).
+    art: { shape: 'rider', weapon: 'spear', body: '#8e8f96', accent: '#5a4632', mount: 'horse' },
   },
   {
     id: 'frostram',
-    name: { en: 'Frostram', nb: 'Frostvær' },
+    name: { en: 'Battering Ram', nb: 'Rambukk' },
     faction: 'hrimfolk',
     cls: 'siege',
     hp: 260,
@@ -230,12 +238,15 @@ export const UNITS: UnitDef[] = [
     age: 2,
     trainedAt: 'workshop',
     traits: ['demolisher'],
-    role: { en: 'Battering ram for gates and halls.', nb: 'Rambukk for porter og haller.' },
+    role: {
+      en: 'Like the rams Vikings built at the siege of Paris (885–886): breaks gates and halls.',
+      nb: 'Som rambukkene vikingene bygde under beleiringen av Paris (885–886): knuser porter og haller.',
+    },
     art: { shape: 'engine', weapon: 'none', body: '#6b4a2e', accent: '#a8c8e0', scale: 1.3 },
   },
   {
     id: 'stormsworn',
-    name: { en: 'Stormsworn', nb: 'Stormsvoren' },
+    name: { en: 'Jarl', nb: 'Jarl' },
     faction: 'hrimfolk',
     cls: 'hero',
     hp: 420,
@@ -259,8 +270,8 @@ export const UNITS: UnitDef[] = [
       cooldown: 30,
     },
     role: {
-      en: 'Hero: storm-blessed champion of the north.',
-      nb: 'Helt: stormvelsignet forkjemper fra nord.',
+      en: "Hero: a war-leading jarl; the Mjölnir amulet at his throat calls down Thor's thunder.",
+      nb: 'Helt: en jarl som leder hæren; Mjølner-amuletten om halsen kaller ned Tors torden.',
     },
     art: {
       shape: 'humanoid',
@@ -268,7 +279,7 @@ export const UNITS: UnitDef[] = [
       body: '#d6d9e0',
       accent: '#f0cf72',
       scale: 1.25,
-      helm: 'horned',
+      helm: 'nasal',
       armor: 'mail',
       shield: 'round',
       cape: true,
@@ -276,7 +287,11 @@ export const UNITS: UnitDef[] = [
   },
   {
     id: 'rimehulk',
-    name: { en: 'Rimehulk', nb: 'Rimkoloss' },
+    name: { en: 'Frost Giant', nb: 'Rimtusse' },
+    role: {
+      en: 'Mythic: a hrímþurs, one of the rime giants sprung from Ymir; its icy hide knits back together.',
+      nb: 'Mytisk: en rimtusse, en av jotnene som stammer fra Yme; den isete huden gror sammen igjen.',
+    },
     faction: 'hrimfolk',
     cls: 'mythic',
     hp: 600,
@@ -296,7 +311,11 @@ export const UNITS: UnitDef[] = [
   },
   {
     id: 'fenwyrm',
-    name: { en: 'Fenwyrm', nb: 'Myrorm' },
+    name: { en: 'Lindworm', nb: 'Lindorm' },
+    role: {
+      en: 'Mythic: a lindormr, a wingless serpent-dragon of fen and forest that spits venom from afar.',
+      nb: 'Mytisk: en lindorm, en vingeløs slangedrage fra myr og skog som spytter gift på avstand.',
+    },
     faction: 'hrimfolk',
     cls: 'mythic',
     hp: 420,
@@ -315,7 +334,11 @@ export const UNITS: UnitDef[] = [
   },
   {
     id: 'bale_wolf',
-    name: { en: 'Bale Wolf', nb: 'Baleulv' },
+    name: { en: 'Ironwood Wolf', nb: 'Jarnvidulv' },
+    role: {
+      en: "Mythic: Fenrir's kin, bred by the old giantess of Járnviðr (Ironwood); strikes hardest at the charge.",
+      nb: 'Mytisk: av Fenrisulvens ætt, fostret av den gamle jotunkvinnen i Jarnvid; slår hardest i første angrep.',
+    },
     faction: 'hrimfolk',
     cls: 'mythic',
     hp: 520,
@@ -335,7 +358,11 @@ export const UNITS: UnitDef[] = [
   },
   {
     id: 'cinder_colossus',
-    name: { en: 'Cinder Colossus', nb: 'Askekoloss' },
+    name: { en: 'Fire Giant', nb: 'Ildjotun' },
+    role: {
+      en: "Mythic: a son of Múspell from Surtr's burning realm, who will set the world ablaze at Ragnarök.",
+      nb: 'Mytisk: en av Muspells sønner fra Surts brennende rike, som skal sette verden i brann ved Ragnarok.',
+    },
     faction: 'hrimfolk',
     cls: 'mythic',
     hp: 1000,

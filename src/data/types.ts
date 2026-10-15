@@ -146,6 +146,8 @@ export type BuildingArt =
 export interface BuildingDef {
   id: string;
   name: LocText;
+  /** Optional faction-specific display names (e.g. a Norse Longhouse); see `buildingName`. */
+  names?: Partial<Record<FactionId, LocText>>;
   /** Footprint in tiles (square). */
   size: number;
   hp: number;

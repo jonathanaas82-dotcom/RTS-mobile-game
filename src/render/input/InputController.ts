@@ -1,4 +1,4 @@
-import { buildingDef, loc, powerDef } from '../../data';
+import { buildingDef, buildingName, loc, powerDef } from '../../data';
 import { getLanguage, t } from '../../i18n';
 import type { Command } from '../../sim/commands';
 import type { Entity } from '../../sim/entity';
@@ -98,7 +98,10 @@ export class InputController {
         hud.showBanner({ text: t('hud.boxBanner'), onCancel: () => this.cancelMode() });
         break;
       case 'place': {
-        const name = loc(buildingDef(m.def).name, getLanguage());
+        const name = loc(
+          buildingName(m.def, this.host.world().players[this.host.me]?.faction),
+          getLanguage(),
+        );
         hud.showBanner({
           text: t('hud.placeBanner', { name }),
           onConfirm: () => this.confirmPlacement(),

@@ -38,7 +38,7 @@ async function shot(name, prep, wait = 1400, arg = null) {
 
 const run = only ? (n) => only.startsWith(n) || n.startsWith(only) : () => true;
 
-// ── Match 1: Hrimfolk (us, AI-driven) vs Aurelian League ──
+// ── Match 1: Norsemen (hrimfolk; us, AI-driven) vs Aurelian League ──
 if (run('1')) {
   await open('?play=1&demo=1&seed=valhollow&faction=hrimfolk&god=thunrak');
   // Early base.

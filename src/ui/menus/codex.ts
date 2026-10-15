@@ -1,7 +1,7 @@
 import {
   FACTIONS,
   UNITS,
-  buildingDef,
+  buildingName,
   factionDef,
   godDef,
   loc,
@@ -325,7 +325,7 @@ function detail(p: HTMLElement, u: UnitDef): void {
       );
   cost.insertAdjacentHTML(
     'beforeend',
-    `<span class="codex-at">${t('codex.trainedAt', { building: loc(buildingDef(u.trainedAt).name, lang) })}</span>`,
+    `<span class="codex-at">${t('codex.trainedAt', { building: loc(buildingName(u.trainedAt, u.faction), lang) })}</span>`,
   );
   for (const id of u.traits ?? []) {
     const tr = el('div', 'codex-trait', p);

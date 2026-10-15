@@ -3,13 +3,17 @@ import type { Cost, FactionDef, LocText } from './types';
 export const FACTIONS: FactionDef[] = [
   {
     id: 'hrimfolk',
-    name: { en: 'The Hrimfolk', nb: 'Rimfolket' },
+    // Viking Age Scandinavia (c. 793–1066) and the gods of the Poetic and Prose Edda.
+    name: { en: 'The Norsemen', nb: 'De norrøne' },
     desc: {
-      en: 'Northern clans. Cheap, tough infantry; workers fight well. Favor flows from battle.',
-      nb: 'Nordlige klaner. Billig, seigt infanteri; arbeiderne slåss godt. Gunst kommer fra kamp.',
+      en: 'Viking Age Scandinavians. Cheap, tough infantry; every free farmer bears arms. Favor flows from battle.',
+      nb: 'Skandinaver fra vikingtiden. Billig, seigt infanteri; hver fri bonde bærer våpen. Gunst kommer fra kamp.',
     },
     favorMode: 'combat',
-    favorDesc: { en: 'Earn Favor by fighting.', nb: 'Tjen gunst ved å kjempe.' },
+    favorDesc: {
+      en: 'Earn Favor by fighting: the gods honour the brave.',
+      nb: 'Tjen gunst ved å kjempe: gudene ærer de modige.',
+    },
     worker: 'hearthkin',
     bonuses: [
       { stat: 'cost', mul: 0.9, classes: ['infantry'] },

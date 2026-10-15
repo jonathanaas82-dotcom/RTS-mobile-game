@@ -1,10 +1,15 @@
 import type { BuildingDef } from './types';
 
-/** Building archetypes shared by all factions (faction look comes from FactionDef.style). */
+/**
+ * Building archetypes shared by all factions (faction look comes from FactionDef.style).
+ * `names` optionally overrides the display name per faction (see `buildingName`).
+ */
 export const BUILDINGS: BuildingDef[] = [
   {
     id: 'town_hall',
     name: { en: 'Town Hall', nb: 'Rådhus' },
+    // Viking Age chieftains ruled from a great hall on their farm (e.g. Borg in Lofoten).
+    names: { hrimfolk: { en: "Chieftain's Hall", nb: 'Høvdinggård' } },
     size: 3,
     hp: 2200,
     armor: 0.3,
@@ -23,6 +28,7 @@ export const BUILDINGS: BuildingDef[] = [
   {
     id: 'house',
     name: { en: 'House', nb: 'Hus' },
+    names: { hrimfolk: { en: 'Longhouse', nb: 'Langhus' } },
     size: 2,
     hp: 400,
     armor: 0.1,
@@ -76,6 +82,8 @@ export const BUILDINGS: BuildingDef[] = [
   {
     id: 'temple',
     name: { en: 'Temple', nb: 'Tempel' },
+    // Old Norse hof: a hall where the blót (sacrificial feast) was held.
+    names: { hrimfolk: { en: 'Hof', nb: 'Hov' } },
     size: 3,
     hp: 1200,
     armor: 0.2,

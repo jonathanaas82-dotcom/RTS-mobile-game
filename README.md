@@ -5,7 +5,8 @@ four ages, choose your gods, summon mythic creatures and raze the enemy's base. 
 **TypeScript + Phaser 3 + Vite**, delivered as an installable, offline-capable **PWA**, ready to
 be wrapped with **Capacitor** for Android/iOS.
 
-All names, factions and art are original. See [PLAN.md](PLAN.md) for milestones and design
+All art is original. The Norsemen faction is based on historical Norse mythology (Poetic and
+Prose Edda, public domain) and the Viking Age; the other two factions' names are original. See [PLAN.md](PLAN.md) for milestones and design
 decisions and [ARCHITECTURE.md](ARCHITECTURE.md) for how the code is organised.
 
 > Status: **M1–M9 complete** — full single-player game (menus, tutorial, three factions, four ages, heroes, mythic units, god powers, AI Easy/Normal/Hard, Norwegian and English) as an offline PWA, plus configured Android/iOS Capacitor projects. See [STORE_CHECKLIST.md](STORE_CHECKLIST.md) for what's left before store release.

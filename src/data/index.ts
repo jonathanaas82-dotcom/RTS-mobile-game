@@ -72,6 +72,12 @@ export function factionUnit(faction: FactionId, cls: UnitDef['cls']): UnitDef | 
   return UNITS.find((u) => u.faction === faction && u.cls === cls && !u.god);
 }
 
+/** Display name of a building for a faction (falls back to the shared name). */
+export function buildingName(def: BuildingDef | string, faction?: FactionId): LocText {
+  const d = typeof def === 'string' ? buildingDef(def) : def;
+  return (faction && d.names?.[faction]) || d.name;
+}
+
 /** Pick the language variant of a data text. */
 export function loc(text: LocText, lang: string): string {
   return lang === 'nb' ? (text.nb ?? text.en) : text.en;

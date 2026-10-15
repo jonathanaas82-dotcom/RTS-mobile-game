@@ -175,7 +175,7 @@ describe('economy', () => {
     expect(p.age).toBe(1);
     expect(p.gods).toEqual(['hrodna']);
     expect(p.powers.map((x) => x.id)).toContain('frostbite');
-    expect(worker.maxHp).toBe(Math.round(hp0 * 1.2)); // Hrodna: workers +20% HP
+    expect(worker.maxHp).toBe(Math.round(hp0 * 1.2)); // Skaði (hrodna): workers +20% HP
   });
 
   it('research applies tech effects once', () => {
