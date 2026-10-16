@@ -2,6 +2,21 @@ import type Phaser from 'phaser';
 import { createCanvas } from './procedural/draw';
 
 /**
+ * Register a static canvas as a texture. Unlike `textures.addCanvas` (a CanvasTexture, which reads
+ * every pixel back with getImageData and keeps a copy for CPU access), this just uploads it:
+ * much faster to create, and half the memory. Use `addCanvas` only when drawing to it later.
+ */
+export function addStaticTexture(
+  textures: Phaser.Textures.TextureManager,
+  key: string,
+  canvas: HTMLCanvasElement,
+): Phaser.Textures.Texture {
+  const tex = textures.addImage(key, canvas as unknown as HTMLImageElement);
+  if (!tex) throw new Error(`texture ${key} failed`);
+  return tex;
+}
+
+/**
  * Packs many small canvases into texture pages (shelf packing) so all sprites of a kind share a
  * texture and render in a single batched draw call. Frames are addressed by name.
  */
@@ -49,8 +64,7 @@ export class AtlasBuilder {
       for (const p of placed) ctx.drawImage(p.canvas, p.x, p.y);
       const texKey = `${key}_${page}`;
       if (textures.exists(texKey)) textures.remove(texKey);
-      const tex = textures.addCanvas(texKey, cv);
-      if (!tex) throw new Error('atlas page failed');
+      const tex = addStaticTexture(textures, texKey, cv);
       // Sprites are drawn at 2x and scaled down: always sample smoothly (some devices default to
       // nearest-neighbour when the renderer runs without antialiasing).
       tex.setFilter(0);

@@ -3,6 +3,7 @@ import type { SimEvent, World } from '../../sim/world';
 import type { WorkAct } from '../assets/procedural/units';
 import type { MatchArt } from '../assets/matchArt';
 import { TILE_PX } from '../assets/tileset';
+import { addStaticTexture } from '../assets/atlas';
 
 /** A floating damage number built from pre-rendered digit sprites (no text re-rendering). */
 interface Floater {
@@ -33,7 +34,7 @@ function ensureDigits(scene: Phaser.Scene): void {
       c.fillText(String(d), d * 20 + 10, row * 28 + 14);
     }
   });
-  const tex = scene.textures.addCanvas('digits', cv)!;
+  const tex = addStaticTexture(scene.textures, 'digits', cv);
   for (let d = 0; d < 10; d++) {
     tex.add(`y${d}`, 0, d * 20, 0, 20, 28);
     tex.add(`r${d}`, 0, d * 20, 28, 20, 28);

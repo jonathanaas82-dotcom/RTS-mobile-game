@@ -33,6 +33,7 @@ import { FogRenderer } from '../effects/FogRenderer';
 import { Minimap } from '../Minimap';
 import type { SoundName } from '../../audio/Sfx';
 import type { WorkAct } from '../assets/procedural/units';
+import { addStaticTexture } from '../assets/atlas';
 
 /** On-screen size of one tile in CSS px at default / min / max zoom. */
 const TILE_CSS_DEFAULT = 46;
@@ -161,7 +162,7 @@ export class WorldScene extends Phaser.Scene {
       ch.waves?.forEach((wl, k) => {
         const wk = `waves_${i}_${k}`;
         if (this.textures.exists(wk)) this.textures.remove(wk);
-        this.textures.addCanvas(wk, wl.canvas)?.setFilter(Phaser.Textures.FilterMode.LINEAR);
+        addStaticTexture(this.textures, wk, wl.canvas).setFilter(Phaser.Textures.FilterMode.LINEAR);
         const img = this.add
           .image(wl.x * TILE_PX, wl.y * TILE_PX, wk)
           .setOrigin(0, 0)
@@ -172,7 +173,7 @@ export class WorldScene extends Phaser.Scene {
         this.waves.push({ img, x: img.x, y: img.y, k, phase: i * 1.7 });
       });
       const key = `ground_${i}`;
-      this.textures.addCanvas(key, ch.canvas)?.setFilter(Phaser.Textures.FilterMode.LINEAR);
+      addStaticTexture(this.textures, key, ch.canvas).setFilter(Phaser.Textures.FilterMode.LINEAR);
       const k = TILE_PX / GROUND_PX;
       this.add
         .image(ch.tx * TILE_PX - GROUND_PAD * k, ch.ty * TILE_PX - GROUND_PAD * k, key)

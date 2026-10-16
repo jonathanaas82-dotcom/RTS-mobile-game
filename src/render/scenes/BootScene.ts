@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { ASSETS } from '../assets/manifest';
+import { addStaticTexture } from '../assets/atlas';
 export const BOOT_READY = 'boot-ready';
 
 /** Loads file assets and generates procedural placeholder textures, then starts the match. */
@@ -17,7 +18,7 @@ export class BootScene extends Phaser.Scene {
   create(): void {
     for (const a of ASSETS) {
       if ('generate' in a && !this.textures.exists(a.key)) {
-        this.textures.addCanvas(a.key, a.generate());
+        addStaticTexture(this.textures, a.key, a.generate());
       }
     }
     document.getElementById('loading')?.remove();

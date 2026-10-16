@@ -2,6 +2,7 @@ import type Phaser from 'phaser';
 import { Terrain } from '../../sim/map/terrain';
 import type { World } from '../../sim/world';
 import { TILE_PX } from '../assets/tileset';
+import { addStaticTexture } from '../assets/atlas';
 
 interface Cloud {
   img: Phaser.GameObjects.Image;
@@ -65,7 +66,7 @@ function makeCritterTextures(scene: Phaser.Scene): void {
     c.beginPath();
     c.ellipse(14, 8.5, 2.6, 1.8, 0, 0, Math.PI * 2);
     c.fill();
-    scene.textures.addCanvas(key, cv);
+    addStaticTexture(scene.textures, key, cv);
   }
   const cv = document.createElement('canvas');
   cv.width = 14;
@@ -82,7 +83,7 @@ function makeCritterTextures(scene: Phaser.Scene): void {
   }
   c.fillStyle = '#2a2018';
   c.fillRect(6.4, 2.5, 1.2, 8);
-  scene.textures.addCanvas('butterfly', cv);
+  addStaticTexture(scene.textures, 'butterfly', cv);
   // A falling leaf (tinted per leaf) and a soft cloud shadow made of overlapping puffs.
   {
     const [lv, lc] = canvas(14, 9);
@@ -98,7 +99,7 @@ function makeCritterTextures(scene: Phaser.Scene): void {
     lc.moveTo(1.5, 4.5);
     lc.lineTo(12, 4.5);
     lc.stroke();
-    scene.textures.addCanvas('leaf', lv);
+    addStaticTexture(scene.textures, 'leaf', lv);
   }
   {
     const W = 320;
@@ -120,7 +121,7 @@ function makeCritterTextures(scene: Phaser.Scene): void {
       cc.fillStyle = g;
       cc.fillRect(0, 0, W, H);
     }
-    scene.textures.addCanvas('cloudShadow', cl);
+    addStaticTexture(scene.textures, 'cloudShadow', cl);
   }
 }
 

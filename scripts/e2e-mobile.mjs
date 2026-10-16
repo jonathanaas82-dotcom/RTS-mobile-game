@@ -537,7 +537,14 @@ try {
       f,
     );
     check(ok, `${f} faction starts`);
-    await page.waitForTimeout(2500);
+    // Give the AI a couple of simulated seconds (first frames are slow on headless GPUs).
+    await page
+      .waitForFunction(
+        () => window.__godforge.game.scene.getScene('World').sim.world.tick >= 60,
+        null,
+        { timeout: 30000 },
+      )
+      .catch(() => {});
     const aiBusy = await page.evaluate(() =>
       window.__godforge.game.scene
         .getScene('World')
