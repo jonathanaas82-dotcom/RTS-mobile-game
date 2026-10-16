@@ -35,8 +35,8 @@ try {
   // manages only a few frames per second, too slow for timing-based gesture checks. Test on Low
   // (1x render scale); real phone GPUs run High comfortably. E2E_GRAPHICS=high overrides.
   await page.addInitScript((q) => {
-    if (!localStorage.getItem('godforge.settings.v1'))
-      localStorage.setItem('godforge.settings.v1', JSON.stringify({ graphics: q }));
+    if (!window.localStorage.getItem('godforge.settings.v1'))
+      window.localStorage.setItem('godforge.settings.v1', JSON.stringify({ graphics: q }));
   }, process.env.E2E_GRAPHICS ?? 'low');
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
