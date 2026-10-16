@@ -1,5 +1,13 @@
 import { buildingDef, factionDef, hasTrait, powerDef, techDef, unitDef } from '../data';
-import { AI_ARMY_MIX, AI_GATHER_SPLIT, AI_PROFILES, AI_STYLE, type AIProfile } from '../data/ai';
+import {
+  AI_ARMY_MIX,
+  AI_GATHER_SPLIT,
+  AI_PROFILES,
+  AI_STYLE,
+  DEFAULT_AI_STYLE,
+  type AIProfile,
+  type AIStyle,
+} from '../data/ai';
 import { counterMultiplier } from '../data/counters';
 import type { ResourceKind } from '../data/balance/economy';
 import { SIM } from '../data/balance/sim';
@@ -32,6 +40,10 @@ interface Wave {
   strength: number;
   tx: number;
   ty: number;
+  /** 'gather': regrouping at the staging point (sx, sy) short of the target; then 'attack'. */
+  phase: 'gather' | 'attack';
+  sx: number;
+  sy: number;
 }
 
 interface KnownBuilding {
@@ -80,7 +92,10 @@ export class AIController implements Controller {
     if (!p || p.defeated || world.winner >= 0) return;
     if ((world.tick + this.me * 7) % this.profile.thinkTicks !== 0) return;
     this.pending = [];
+    this.reserved = [];
+    this.claimed.clear();
     this.observe();
+    this.plan(p);
     this.economy(p);
     this.buildOrder(p);
     this.ages(p);
@@ -92,6 +107,10 @@ export class AIController implements Controller {
     this.powers(p);
     if (this.profile.micro) this.heroes();
     for (const c of this.pending) issue(c);
+  }
+
+  private style(): AIStyle {
+    return AI_STYLE[this.world.players[this.me]!.faction] ?? DEFAULT_AI_STYLE;
   }
 
   private say(msg: string): void {
@@ -169,10 +188,36 @@ export class AIController implements Controller {
     near: { x: number; y: number },
     builders: number,
     minR = 2,
+    maxR = 16,
   ): boolean {
     if (!canPlace(this.world, p, def).ok) return false;
     const size = buildingDef(def).size;
-    const spot = findBuildSpot(this.world, this.me, size, near.x, near.y, minR);
+    let spot = findBuildSpot(
+      this.world,
+      this.me,
+      size,
+      near.x,
+      near.y,
+      minR,
+      maxR,
+      this.homeRegion(),
+    );
+    // A crowded base (many farms): look around our other buildings before giving up, or a
+    // full base would stop building houses and stall at its population cap.
+    if (!spot && maxR >= 16) {
+      const others = this.mine((e) => e.kind === 'building' && e.built && e.def !== 'farm')
+        .sort(
+          (a, b) =>
+            (a.x - near.x) ** 2 +
+              (a.y - near.y) ** 2 -
+              ((b.x - near.x) ** 2 + (b.y - near.y) ** 2) || a.id - b.id,
+        )
+        .slice(0, 6);
+      for (const o of others) {
+        spot = findBuildSpot(this.world, this.me, size, o.x, o.y, 2, 10, this.homeRegion());
+        if (spot) break;
+      }
+    }
     if (!spot) return false;
     const workers = this.pickBuilders(builders, spot.x + size / 2, spot.y + size / 2);
     if (workers.length === 0) return false;
@@ -188,6 +233,25 @@ export class AIController implements Controller {
     this.reserved.push(costOf(p, this.world.tick, def));
     this.say(`build ${def}`);
     return true;
+  }
+
+  /** The walkable region most of our workers stand in (where foundations must be reachable). */
+  private homeRegion(): number {
+    const n = new Map<number, number>();
+    let best = 0;
+    let bestN = 0;
+    const g = this.world.grid;
+    for (const u of this.mine((e) => e.cls === 'worker' && e.inside < 0)) {
+      const r = g.region(Math.floor(u.x), Math.floor(u.y));
+      if (!r) continue;
+      const c = (n.get(r) ?? 0) + 1;
+      n.set(r, c);
+      if (c > bestN || (c === bestN && r < best)) {
+        bestN = c;
+        best = r;
+      }
+    }
+    return best;
   }
 
   /** Costs committed this think (commands not applied yet). */
@@ -206,8 +270,18 @@ export class AIController implements Controller {
     return true;
   }
 
+  /** Workers given an order this think (their commands are not applied yet). */
+  private claimed = new Set<number>();
+
   private pickBuilders(n: number, x: number, y: number): Entity[] {
-    const workers = this.mine((e) => e.cls === 'worker' && e.order.type !== 'build');
+    const workers = this.mine(
+      (e) =>
+        e.cls === 'worker' &&
+        e.order.type !== 'build' &&
+        e.order.type !== 'garrison' &&
+        e.inside < 0 &&
+        !this.claimed.has(e.id),
+    );
     // Prefer idle, then wood gatherers, nearest first.
     workers.sort((a, b) => {
       const pa = a.order.type === 'idle' ? 0 : a.carryKind === 'wood' || a.order.tile >= 0 ? 1 : 2;
@@ -218,17 +292,118 @@ export class AIController implements Controller {
         a.id - b.id
       );
     });
-    return workers.slice(0, n);
+    const picked = workers.slice(0, n);
+    for (const u of picked) this.claimed.add(u.id);
+    return picked;
+  }
+
+  /** Unfinished buildings that have a worker on the job. */
+  private staffed(): Set<number> {
+    const s = new Set<number>();
+    for (const u of this.mine((e) => e.cls === 'worker' && e.order.type === 'build'))
+      s.add(u.order.target);
+    return s;
+  }
+
+  /**
+   * Foundations whose builders died or were pulled away would otherwise sit forever (and an
+   * unfinished house blocks new houses): send a worker to finish one per think, unless enemies
+   * are standing on it.
+   */
+  private staffFoundations(): void {
+    const staffed = this.staffed();
+    const tick = this.world.tick;
+    for (const [id] of this.foundations) if (!this.world.byId.get(id)) this.foundations.delete(id);
+    for (const b of this.mine((e) => e.kind === 'building' && !e.built)) {
+      // Track progress: a foundation nobody managed to work on for 90 s is given up on (it is
+      // unreachable or keeps getting its builders killed) and no longer blocks new buildings.
+      const rec = this.foundations.get(b.id);
+      if (!rec || b.progress > rec.progress + 1e-4)
+        this.foundations.set(b.id, { progress: b.progress, tick });
+      if (this.isAbandoned(b)) continue;
+      if (staffed.has(b.id) || this.enemiesNear(b.x, b.y, 8) > 0) continue;
+      const [u] = this.pickBuilders(1, b.x, b.y);
+      if (!u) return;
+      this.cmd({ type: 'construct', player: this.me, ids: [u.id], target: b.id });
+      return;
+    }
+  }
+
+  private readonly foundations = new Map<number, { progress: number; tick: number }>();
+
+  private isAbandoned(b: Entity): boolean {
+    const rec = this.foundations.get(b.id);
+    return !b.built && !!rec && this.world.tick - rec.tick > TPS * 90;
+  }
+
+  /** Visible enemy units (not workers) within r of a point. */
+  private enemiesNear(x: number, y: number, r: number): number {
+    let n = 0;
+    for (const o of this.world.spatial.query(x, y, r)) {
+      if (o.dead || o.kind !== 'unit' || o.owner < 0 || o.owner === this.me) continue;
+      if (o.cls === 'worker' || !visibleFor(this.world, this.me, o)) continue;
+      n++;
+    }
+    return n;
   }
 
   private underConstruction(def?: string): number {
-    return this.mine((e) => e.kind === 'building' && !e.built && (!def || e.def === def)).length;
+    return this.mine(
+      (e) => e.kind === 'building' && !e.built && (!def || e.def === def) && !this.isAbandoned(e),
+    ).length;
   }
 
   // ───────────── economy ─────────────
 
+  /**
+   * Pick the one thing worth saving for this think (rebuilding a lost Town Hall, the first
+   * Barracks, the next age). Lower-priority spending keeps its cost aside, so cheap repeat
+   * purchases (farms, shrines, techs, extra units) can't starve it forever.
+   */
+  private plan(p: PlayerState): void {
+    const w = this.world;
+    this.goal = null;
+    const workers = this.mine((e) => e.cls === 'worker').length;
+    const have = (def: string): number => countOwned(w, this.me, def, false);
+    if (this.profile.passive) return;
+    if (have('town_hall') === 0 && workers >= 3 && canPlaceIgnoringCost(w, p, 'town_hall')) {
+      this.goal = { def: 'town_hall', cost: costOf(p, w.tick, 'town_hall') };
+      return;
+    }
+    // Some openings boom first, but never without a single Barracks past the first minutes.
+    if (have('barracks') === 0 && workers >= 8 && (p.age >= 1 || w.tick > TPS * 240)) {
+      this.goal = { def: 'barracks', cost: costOf(p, w.tick, 'barracks') };
+      return;
+    }
+    // Siege breaks Town Halls and towers: without it late games stall into draws.
+    if (
+      this.profile.siege &&
+      p.age >= 2 &&
+      have('workshop') === 0 &&
+      (p.age >= this.profile.maxAge || w.tick > TPS * 60 * 18) &&
+      canPlaceIgnoringCost(w, p, 'workshop')
+    ) {
+      this.goal = { def: 'workshop', cost: costOf(p, w.tick, 'workshop') };
+      return;
+    }
+    const age = this.ageReserve(p);
+    if (Object.keys(age).length) this.goal = { def: 'age', cost: age };
+  }
+
+  /** What `plan` decided to save for (null = nothing). */
+  private goal: { def: string; cost: Partial<Record<ResourceKind, number>> } | null = null;
+
+  /**
+   * Resources lower-priority spending must leave untouched (the goal's cost). `essential`
+   * spending (farms, favor buildings, drop-offs) only waits for building goals, not for an age.
+   */
+  private keep(forDef?: string, essential = false): Partial<Record<ResourceKind, number>> {
+    if (!this.goal || this.goal.def === forDef) return {};
+    if (essential && this.goal.def === 'age') return {};
+    return this.goal.cost;
+  }
+
   private economy(p: PlayerState): void {
-    this.reserved = [];
     const w = this.world;
     const workers = this.mine((e) => e.cls === 'worker');
     const target = this.profile.workers[p.age] ?? 20;
@@ -249,9 +424,24 @@ export class AIController implements Controller {
         break;
       }
     }
-    // Houses before we get pop-blocked.
-    const housing = this.underConstruction('house') + this.underConstruction('town_hall');
-    if (p.popCap < 200 && p.popCap - p.pop <= 3 + Math.floor(p.popCap / 25) && housing === 0) {
+    // Houses before we get pop-blocked (abandoned foundations don't count: they get restaffed
+    // below, or replaced when enemies camp on them).
+    const staffed = this.staffed();
+    const housing = this.mine(
+      (e) =>
+        e.kind === 'building' &&
+        !e.built &&
+        (e.def === 'house' || e.def === 'town_hall') &&
+        staffed.has(e.id) &&
+        !this.isAbandoned(e),
+    ).length;
+    // A big economy fills a house in no time: build two at once when wood is plentiful.
+    const maxHousing = p.res.wood > 300 && p.popCap >= 40 ? 2 : 1;
+    if (
+      p.popCap < 200 &&
+      p.popCap - p.pop <= 3 + Math.floor(p.popCap / 25) + (maxHousing - 1) * 5 &&
+      housing < maxHousing
+    ) {
       const h = this.home();
       if (h && this.affordable(p, costOf(p, w.tick, 'house'))) this.build(p, 'house', h, 1, 3);
     }
@@ -260,7 +450,7 @@ export class AIController implements Controller {
     const count = { food: 0, wood: 0, gold: 0 } as Record<'food' | 'wood' | 'gold', number>;
     const idle: Entity[] = [];
     for (const u of workers) {
-      if (u.order.type === 'idle' && u.inside < 0) idle.push(u);
+      if (u.order.type === 'idle' && u.inside < 0 && !this.claimed.has(u.id)) idle.push(u);
       else if (u.order.type === 'gather' || u.order.type === 'return') {
         const k = gatherKind(w, u) ?? u.carryKind;
         if (k && k !== 'favor') count[k]++;
@@ -283,6 +473,7 @@ export class AIController implements Controller {
       }
       if (!assigned) break;
     }
+    this.staffFoundations();
     this.rebalance(p, workers, count, split);
     this.dropoffs(p, workers);
     this.farms(p, count.food, Math.round(split[0] * workers.length));
@@ -292,13 +483,18 @@ export class AIController implements Controller {
   private dynamicSplit(p: PlayerState): [number, number, number] {
     const base = AI_GATHER_SPLIT[p.age]!;
     const stock = [p.res.food, p.res.wood, p.res.gold];
-    // What we are saving for (next age), so workers move to the resource that's missing.
+    // What we are saving for (the plan's goal, else the next age), so workers move to the
+    // resource that's missing.
     const info = nextAge(p);
-    const goal = info && p.age < this.profile.maxAge ? info.cost : {};
+    const goal = this.goal?.cost ?? (info && p.age < this.profile.maxAge ? info.cost : {});
     const need = [goal.food ?? 0, goal.wood ?? 0, goal.gold ?? 0];
+    const tick = this.world.tick;
     // About to be pop-capped: a house's wood is the most urgent need of all.
-    if (p.popCap < 200 && p.popCap - p.pop <= 4)
-      need[1] = need[1]! + (costOf(p, this.world.tick, 'house').wood ?? 0) * 2;
+    if (p.popCap < 200 && p.popCap - p.pop <= 6)
+      need[1] = need[1]! + (costOf(p, tick, 'house').wood ?? 0) * 2;
+    // Food sources running dry: farms cost wood.
+    const farmsShort = this.farmsShort;
+    if (farmsShort > 0) need[1] = need[1]! + farmsShort * (costOf(p, tick, 'farm').wood ?? 0);
     const adj = base.map((b, i) => {
       const s = stock[i]!;
       const short = Math.max(0, need[i]! - s);
@@ -334,7 +530,10 @@ export class AIController implements Controller {
     // Prefer empty-handed workers, but farmers almost always carry something: fall back to any
     // worker on the over-staffed resource (they drop at most one load). Big gaps move two.
     const on = workers.filter(
-      (u) => u.order.type === 'gather' && (gatherKind(w, u) ?? u.carryKind) === over.k,
+      (u) =>
+        u.order.type === 'gather' &&
+        !this.claimed.has(u.id) &&
+        (gatherKind(w, u) ?? u.carryKind) === over.k,
     );
     on.sort((a, b) => a.carry - b.carry);
     const moves = over.d >= 3 && under.d <= -3 ? 2 : 1;
@@ -358,6 +557,7 @@ export class AIController implements Controller {
       if (tile < 0) tile = nearestForest(w, base.x, base.y, 40);
       if (tile < 0) return false;
       this.cmd({ type: 'gather', player: this.me, ids: [u.id], target: -1, tile });
+      this.claimed.add(u.id);
       return true;
     }
     let best: Entity | null = null;
@@ -397,7 +597,7 @@ export class AIController implements Controller {
         this.affordable(p, costOf(p, w.tick, 'farm')) &&
         canPlace(w, p, 'farm').ok
       ) {
-        const spot = findBuildSpot(w, this.me, 2, h.x, h.y, 3, 14);
+        const spot = findBuildSpot(w, this.me, 2, h.x, h.y, 3, 14, this.homeRegion());
         if (spot) {
           this.cmd({
             type: 'build',
@@ -408,6 +608,7 @@ export class AIController implements Controller {
             tileY: spot.y,
           });
           this.reserved.push(costOf(p, w.tick, 'farm'));
+          this.claimed.add(u.id);
           return true;
         }
       }
@@ -427,28 +628,53 @@ export class AIController implements Controller {
       if (alt) best = alt;
     }
     this.cmd({ type: 'gather', player: this.me, ids: [u.id], target: best.id, tile: -1 });
+    this.claimed.add(u.id);
     return true;
   }
 
   private dropoffs(p: PlayerState, workers: Entity[]): void {
     if (this.underConstruction('storehouse') > 0 || p.res.wood < 80) return;
     const w = this.world;
-    // A wood or gold cluster far from any drop-off gets a storehouse.
+    // A wood or gold cluster far from any drop-off gets a storehouse — judged from the worker's
+    // source (not wherever it is walking), placed right next to it, and never next to another
+    // storehouse (otherwise awkward spots spawned dozens of them).
+    // Not before the first Barracks: the opening needs that wood more.
+    if (countOwned(w, this.me, 'barracks', false) === 0 && !this.profile.passive) return;
+    const stores = this.mine((e) => e.def === 'storehouse');
+    const h = this.home();
     for (const u of workers) {
-      const k = u.carryKind;
-      if (!k || k === 'food' || u.order.type !== 'gather') continue;
-      const drop = nearestDropoff(w, u, k);
-      const d = drop ? Math.sqrt((drop.x - u.x) ** 2 + (drop.y - u.y) ** 2) : 99;
-      if (d > 7.5) {
-        if (this.build(p, 'storehouse', { x: u.x, y: u.y }, 1, 1)) return;
+      if (u.order.type !== 'gather') continue;
+      const k = gatherKind(w, u);
+      if (k !== 'wood' && k !== 'gold') continue;
+      const W = w.map.width;
+      const src =
+        u.order.tile >= 0
+          ? { x: (u.order.tile % W) + 0.5, y: Math.floor(u.order.tile / W) + 0.5 }
+          : w.byId.get(u.order.target);
+      if (!src || (src.x - u.x) ** 2 + (src.y - u.y) ** 2 > 3 * 3) continue;
+      const drop = nearestDropoff(w, { ...u, x: src.x, y: src.y }, k);
+      const d = drop ? Math.sqrt((drop.x - src.x) ** 2 + (drop.y - src.y) ** 2) : 99;
+      if (d <= 7.5 || stores.some((b) => (b.x - src.x) ** 2 + (b.y - src.y) ** 2 < 7 * 7)) continue;
+      if (!this.affordable(p, costOf(p, w.tick, 'storehouse'), this.keep('storehouse', true)))
+        return;
+      // Search from a point a little towards home, so it lands between the source and base.
+      let near = { x: src.x, y: src.y };
+      if (h) {
+        const hd = Math.sqrt((h.x - src.x) ** 2 + (h.y - src.y) ** 2) || 1;
+        near = { x: src.x + ((h.x - src.x) / hd) * 2, y: src.y + ((h.y - src.y) / hd) * 2 };
       }
+      if (this.build(p, 'storehouse', near, 1, 1, 5)) return;
     }
   }
+
+  /** Farms still wanted because wild food is running out (read by the gather split). */
+  private farmsShort = 0;
 
   private farms(p: PlayerState, foodWorkers: number, wantFood: number): void {
     const w = this.world;
     const h = this.home();
-    if (!h || this.underConstruction('farm') > 1) return;
+    this.farmsShort = 0;
+    if (!h) return;
     if (foodWorkers >= wantFood && countOwned(this.world, this.me, 'farm', false) >= foodWorkers)
       return;
     // Start farming before the berries run out so food never stalls.
@@ -463,8 +689,11 @@ export class AIController implements Controller {
     }
     if (berryFood > 120 * Math.max(1, foodWorkers)) return;
     const farms = countOwned(w, this.me, 'farm', false);
-    if (farms >= wantFood + 1) return;
-    if (this.affordable(p, costOf(p, w.tick, 'farm'), { wood: 0 })) this.build(p, 'farm', h, 1, 3);
+    this.farmsShort = Math.max(0, wantFood - farms);
+    if (farms >= wantFood + 1 || this.underConstruction('farm') > 1) return;
+    // Farms wait for the saving goal unless food gathering is collapsing.
+    const keep = foodWorkers < wantFood * 0.5 ? {} : this.keep('farm', true);
+    if (this.affordable(p, costOf(p, w.tick, 'farm'), keep)) this.build(p, 'farm', h, 1, 3);
   }
 
   private favorBuildings(p: PlayerState): void {
@@ -476,7 +705,7 @@ export class AIController implements Controller {
       return;
     if (this.mine((e) => e.cls === 'worker').length < 8) return;
     const h = this.home();
-    if (h && this.affordable(p, costOf(p, this.world.tick, def), { food: 0 }))
+    if (h && this.affordable(p, costOf(p, this.world.tick, def), this.keep(def, true)))
       this.build(p, def, h, 1, 3);
   }
 
@@ -491,17 +720,19 @@ export class AIController implements Controller {
     const workers = this.mine((e) => e.cls === 'worker').length;
     const have = (def: string): number => countOwned(w, this.me, def, false);
     const goals: Array<[string, boolean]> = [
+      // A lost Town Hall is rebuilt first: no workers, no ages, and defeat once the army is gone.
+      ['town_hall', have('town_hall') < 1 && p.age >= 1 && workers >= 3],
       ['barracks', workers >= 8 && have('barracks') < 1],
       ['temple', (workers >= 12 || p.age >= 1) && have('temple') < 1],
       ['barracks', p.age >= 1 && have('barracks') < prof.barracks],
       ['stable', p.age >= 1 && have('stable') < prof.stables],
       ['tower', p.age >= 1 && have('tower') < prof.towers],
-      ['workshop', p.age >= 2 && have('workshop') < 1 && this.difficulty !== 'easy'],
+      ['workshop', p.age >= 2 && have('workshop') < 1 && prof.siege],
       ['town_hall', p.age >= 2 && have('town_hall') < 2 && workers >= 24],
     ];
     for (const [def, want] of goals) {
       if (!want || this.underConstruction(def) > 0) continue;
-      if (!this.affordable(p, costOf(p, w.tick, def), this.ageReserve(p))) continue;
+      if (!this.affordable(p, costOf(p, w.tick, def), this.keep(def))) continue;
       const near = def === 'tower' ? this.rally() : h;
       if (this.build(p, def, near, def === 'town_hall' ? 3 : 2, def === 'tower' ? 0 : 3)) return;
     }
@@ -533,7 +764,13 @@ export class AIController implements Controller {
 
   private research(p: PlayerState): void {
     const w = this.world;
-    const keep = { food: 250, wood: 150, gold: 250, ...this.ageReserve(p) };
+    const goal = this.keep();
+    const keep = {
+      food: Math.max(250, goal.food ?? 0),
+      wood: Math.max(150, goal.wood ?? 0),
+      gold: Math.max(250, goal.gold ?? 0),
+      favor: goal.favor ?? 0,
+    };
     for (const b of this.mine((e) => e.kind === 'building' && e.built && e.queue.length === 0)) {
       for (const t of techOptions(p, b.def)) {
         if (!canResearch(w, p, b, t.id).ok || !this.affordable(p, t.cost, keep)) continue;
@@ -552,9 +789,13 @@ export class AIController implements Controller {
     const w = this.world;
     const minutes = w.tick / TPS / 60;
     const armyPop = this.armyUnits().reduce((n, u) => n + unitDef(u.def).pop, 0);
-    // Keep a minimum standing army even while saving for the next age.
-    const minArmy = Math.min(40, minutes * (this.difficulty === 'easy' ? 0.6 : 1.4));
-    const keep = armyPop < minArmy ? {} : this.ageReserve(p);
+    // Keep a minimum standing army even while saving (only half of it while saving for an age,
+    // or armies traded in endless waves would starve the age advance forever) — more when
+    // we've just been attacked.
+    const threatened = !!this.lastThreat && w.tick - this.lastThreat.tick < TPS * 20;
+    const saving = this.goal?.def === 'age' && !threatened ? this.style().saveArmy : 1;
+    const minArmy = Math.min(40, minutes * this.profile.minArmyPerMin) * saving;
+    const keep = armyPop < minArmy ? {} : this.keep();
     for (const b of this.mine((e) => e.kind === 'building' && e.built && e.queue.length < 2)) {
       if (b.def === 'town_hall') continue;
       const options = trainOptions(p, b.def).filter((u) => u.cls !== 'worker');
@@ -659,6 +900,11 @@ export class AIController implements Controller {
     const w = this.world;
     const army = this.armyUnits();
     if (army.length === 0) {
+      // The wave died: the next units gather at home instead of trickling to the front.
+      if (this.wave) {
+        this.wave = null;
+        this.wavesSent++;
+      }
       const t = this.findThreat();
       if (t) {
         this.lastThreat = { ...t, tick: w.tick };
@@ -673,6 +919,18 @@ export class AIController implements Controller {
       const defenders = this.wave
         ? army.filter((u) => (u.x - threat.x) ** 2 + (u.y - threat.y) ** 2 < 30 * 30)
         : army;
+      // A real raid at home while the wave is away: bring the wave back rather than trade our
+      // economy for theirs (workers alone can't hold).
+      if (this.wave) {
+        const raid = this.enemyStrengthNear(threat.x, threat.y, 10);
+        if (raid >= 3 && this.strength(defenders) < raid) {
+          this.wave = null;
+          this.wavesSent++;
+          this.say('recall wave');
+          defenders.length = 0;
+          defenders.push(...army);
+        }
+      }
       if (defenders.length < 3) this.workersDefend(threat);
       const ids = defenders.filter((u) => u.order.type !== 'attack').map((u) => u.id);
       if (ids.length) {
@@ -686,21 +944,32 @@ export class AIController implements Controller {
     const minutes = w.tick / TPS / 60;
     const pop = army.reduce((s, u) => s + unitDef(u.def).pop, 0);
     if (!this.wave) {
-      const style = AI_STYLE[w.players[this.me]!.faction] ?? { attackEarlierMin: 0, waveScale: 1 };
-      const need =
-        Math.min(
-          this.profile.wavePop + this.profile.waveGrowth * this.wavesSent,
-          this.profile.wavePop * 2.2,
-        ) * style.waveScale;
+      const style = this.style();
+      // Waves grow, but late in a match (economies thinning out, gold running dry) the base wave
+      // size is enough again — otherwise a winning side can sit at home until the time limit.
+      const grown = Math.min(
+        this.profile.wavePop + this.profile.waveGrowth * this.wavesSent,
+        this.profile.wavePop * 2.2,
+      );
+      const need = (minutes > 25 ? this.profile.wavePop : grown) * style.waveScale;
       if (minutes >= this.profile.firstAttackMin - style.attackEarlierMin && pop >= need) {
         const t = this.attackTarget();
-        this.wave = { launched: w.tick, strength: this.strength(army), tx: t.x, ty: t.y };
+        const st = this.stagingPoint(t);
+        this.wave = {
+          launched: w.tick,
+          strength: this.strength(army),
+          tx: t.x,
+          ty: t.y,
+          phase: st ? 'gather' : 'attack',
+          sx: st?.x ?? t.x,
+          sy: st?.y ?? t.y,
+        };
         this.cmd({
           type: 'attackMove',
           player: this.me,
           ids: army.map((u) => u.id),
-          x: t.x,
-          y: t.y,
+          x: this.wave.sx,
+          y: this.wave.sy,
         });
         this.say(`attack wave ${this.wavesSent + 1} (pop ${pop})`);
         return;
@@ -716,14 +985,35 @@ export class AIController implements Controller {
     }
     // Wave in progress.
     const s = this.strength(army);
-    // Late in the match, commit harder (fewer retreats) so games reach a conclusion.
-    const late = w.tick / TPS / 60 > 18 ? 0.5 : 1;
+    // Late in the match, commit harder (fewer retreats, none after 30 min) so games end.
+    const late = minutes > 30 ? 0 : minutes > 18 ? 0.5 : 1;
     if (s < this.wave.strength * this.profile.retreatAt * late) {
       const r = this.rally();
       this.cmd({ type: 'move', player: this.me, ids: army.map((u) => u.id), x: r.x, y: r.y });
       this.say('retreat');
       this.wave = null;
       this.wavesSent++;
+      return;
+    }
+    // Regroup short of the target so the army arrives together, not single file into towers.
+    if (this.wave.phase === 'gather') {
+      const { sx, sy } = this.wave;
+      const near = army.filter((u) => (u.x - sx) ** 2 + (u.y - sy) ** 2 < 6 * 6).length;
+      if (near >= army.length * 0.75 || w.tick - this.wave.launched > TPS * 35) {
+        this.wave.phase = 'attack';
+        this.cmd({
+          type: 'attackMove',
+          player: this.me,
+          ids: army.map((u) => u.id),
+          x: this.wave.tx,
+          y: this.wave.ty,
+        });
+      } else {
+        const ids = army
+          .filter((u) => u.order.type === 'idle' && (u.x - sx) ** 2 + (u.y - sy) ** 2 >= 6 * 6)
+          .map((u) => u.id);
+        if (ids.length) this.cmd({ type: 'attackMove', player: this.me, ids, x: sx, y: sy });
+      }
       return;
     }
     // Retarget when the objective is gone; send idle/new units to the front.
@@ -733,22 +1023,60 @@ export class AIController implements Controller {
       this.wave.tx = t.x;
       this.wave.ty = t.y;
     }
-    const ids = army
-      .filter(
-        (u) =>
-          u.order.type === 'idle' ||
-          u.order.type === 'move' ||
-          (moved && u.order.type === 'attackMove' && u.order.target < 0),
-      )
-      .map((u) => u.id);
+    // Reinforcements far behind the front go in groups of 3+, not one by one.
+    const front = this.leadUnit() ?? { x: this.wave.tx, y: this.wave.ty };
+    const free = army.filter(
+      (u) =>
+        u.order.type === 'idle' ||
+        u.order.type === 'move' ||
+        (moved && u.order.type === 'attackMove' && u.order.target < 0),
+    );
+    const far = free.filter((u) => (u.x - front.x) ** 2 + (u.y - front.y) ** 2 > 20 * 20);
+    const ids = (far.length >= 3 ? free : free.filter((u) => !far.includes(u))).map((u) => u.id);
     if (ids.length)
       this.cmd({ type: 'attackMove', player: this.me, ids, x: this.wave.tx, y: this.wave.ty });
+    if (far.length < 3) {
+      const r = this.rally();
+      const loose = far.filter(
+        (u) => u.order.type === 'idle' && (u.x - r.x) ** 2 + (u.y - r.y) ** 2 > 25,
+      );
+      if (loose.length)
+        this.cmd({ type: 'move', player: this.me, ids: loose.map((u) => u.id), x: r.x, y: r.y });
+    }
     // A wave that has run for very long without reaching anything restarts.
     if (w.tick - this.wave.launched > TPS * 240) {
       this.wave = null;
       this.wavesSent++;
     }
     void p;
+  }
+
+  /** Total strength (pop x health) of visible enemy fighters within r of a point. */
+  private enemyStrengthNear(x: number, y: number, r: number): number {
+    let s = 0;
+    for (const o of this.world.spatial.query(x, y, r)) {
+      if (o.dead || o.kind !== 'unit' || o.owner < 0 || o.owner === this.me) continue;
+      if (o.cls === 'worker' || !visibleFor(this.world, this.me, o)) continue;
+      s += unitDef(o.def).pop * (o.hp / o.maxHp);
+    }
+    return s;
+  }
+
+  /** A walkable point ~13 tiles short of the target on the way from home (null if close). */
+  private stagingPoint(t: { x: number; y: number }): { x: number; y: number } | null {
+    const h = this.home();
+    if (!h) return null;
+    const dx = t.x - h.x;
+    const dy = t.y - h.y;
+    const d = Math.sqrt(dx * dx + dy * dy);
+    if (d < 24) return null;
+    const k = (d - 13) / d;
+    const ti = this.world.grid.nearestWalkable(h.x + dx * k, h.y + dy * k);
+    if (ti < 0) return null;
+    const W = this.world.map.width;
+    const p = { x: (ti % W) + 0.5, y: Math.floor(ti / W) + 0.5 };
+    const r = this.rally();
+    return this.world.grid.connected(r.x, r.y, p.x, p.y) ? p : null;
   }
 
   private lastScout = -10000;
@@ -798,12 +1126,17 @@ export class AIController implements Controller {
         e.kind === 'unit' &&
         e.owner >= 0 &&
         e.owner !== this.me &&
-        (e.x - t.x) ** 2 + (e.y - t.y) ** 2 < 36 &&
+        (e.x - t.x) ** 2 + (e.y - t.y) ** 2 < 8 * 8 &&
         visibleFor(w, this.me, e),
     );
     const near = this.mine((e) => e.cls === 'worker' && (e.x - t.x) ** 2 + (e.y - t.y) ** 2 < 64);
     if (raiders.length === 0) return;
-    if (near.length < raiders.length * 2) {
+    // Workers only take on a small raid with clear numbers; against a real army they would just
+    // die (the economy is worth more than the fight), so they shelter instead.
+    let strength = 0;
+    for (const r of raiders)
+      strength += r.cls === 'worker' ? 0.5 : unitDef(r.def).pop * (r.hp / r.maxHp);
+    if (strength > 4 || near.length < strength * 3) {
       // Too many raiders: hide the nearby workers in the Town Hall (adds arrows).
       const ids = near.filter((u) => u.inside < 0 && u.order.type !== 'garrison').map((u) => u.id);
       if (ids.length) {
@@ -827,17 +1160,27 @@ export class AIController implements Controller {
     }
   }
 
+  /**
+   * Nearest visible enemy near our buildings (12 tiles) or near our workers out in the field
+   * (7 tiles: raids on a forest or a far gold mine). Enemy buildings with an attack (a tower
+   * rushed next to our base) and enemy foundations count too, so towers can't box us in.
+   */
   private findThreat(): { x: number; y: number } | null {
     const w = this.world;
-    const mineB = this.mine((e) => e.kind === 'building');
+    const anchors: Array<[number, number, number]> = [];
+    for (const e of this.mine((e) => e.kind === 'building' || (e.cls === 'worker' && e.inside < 0)))
+      anchors.push([e.x, e.y, e.kind === 'building' ? 12 * 12 : 7 * 7]);
     let best: { x: number; y: number } | null = null;
     let bestD = Infinity;
     for (const e of w.entities) {
-      if (e.dead || e.kind !== 'unit' || e.owner < 0 || e.owner === this.me) continue;
+      if (e.dead || e.owner < 0 || e.owner === this.me) continue;
+      if (e.kind === 'building') {
+        if (e.built && !buildingDef(e.def).attack) continue;
+      } else if (e.kind !== 'unit' || e.inside >= 0) continue;
       if (!visibleFor(w, this.me, e)) continue;
-      for (const b of mineB) {
-        const d = (b.x - e.x) ** 2 + (b.y - e.y) ** 2;
-        if (d < 12 * 12 && d < bestD) {
+      for (const [x, y, r2] of anchors) {
+        const d = (x - e.x) ** 2 + (y - e.y) ** 2;
+        if (d < r2 && d < bestD) {
           bestD = d;
           best = { x: e.x, y: e.y };
         }
@@ -962,6 +1305,12 @@ export class AIController implements Controller {
   }
 
   private frontOfArmy(): { x: number; y: number } | null {
+    const best = this.leadUnit();
+    return best && this.bestEnemyCluster(8, 2) ? { x: best.x, y: best.y } : null;
+  }
+
+  /** Our army unit closest to the wave's target. */
+  private leadUnit(): Entity | null {
     if (!this.wave) return null;
     const army = this.armyUnits();
     let best: Entity | null = null;
@@ -973,7 +1322,7 @@ export class AIController implements Controller {
         best = u;
       }
     }
-    return best && this.bestEnemyCluster(8, 2) ? { x: best.x, y: best.y } : null;
+    return best;
   }
 
   private heroes(): void {
@@ -1018,10 +1367,22 @@ export class AIController implements Controller {
     }
     return [
       `AI ${this.difficulty} p${this.me} age ${p.age} workers ${workers}/${this.profile.workers[p.age]}`,
-      `F${g.food} W${g.wood} G${g.gold} idle${g.idle} build${g.build} ?${g.other} farms ${countOwned(w, this.me, 'farm', false)}`,
+      `F${g.food} W${g.wood} G${g.gold} idle${g.idle} build${g.build} ?${g.other} farms ${countOwned(w, this.me, 'farm', false)} want ${this.dynamicSplit(
+        p,
+      )
+        .map((s) => Math.round(s * workers))
+        .join('/')}`,
       `army ${army.length} str ${this.strength(army).toFixed(1)} wave ${this.wave ? 'ON' : 'off'} sent ${this.wavesSent}`,
       `seen ${mix || '-'} known bldg ${this.known.size}`,
       ...this.log.slice(-4),
     ].join('\n');
   }
+}
+
+/** canPlace without the cost check (can we build this at all, given age/faction/limits?). */
+function canPlaceIgnoringCost(world: World, p: PlayerState, def: string): boolean {
+  const d = buildingDef(def);
+  if (d.factions && !d.factions.includes(p.faction)) return false;
+  if (d.age > p.age) return false;
+  return d.limit === undefined || countOwned(world, p.id, def) < d.limit;
 }
