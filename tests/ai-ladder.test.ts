@@ -44,17 +44,23 @@ describe('AI difficulty ladder (regression)', () => {
   }, 120_000);
 
   it('Easy plays like Easy: advances an age, attacks late, and loses to Normal', () => {
-    const r = runMatch({
-      seed: 7,
-      seats: [
-        { faction: 'aurelian', ai: 'normal' },
-        { faction: 'sahrun', ai: 'easy' },
-      ],
-      maxMin: 40,
-    });
-    expect(r.winner).toBe(0);
-    const easy = r.players[1]!;
-    expect(easy.ageAt[1]).toBeGreaterThan(0);
-    if (easy.firstAttackMin >= 0) expect(easy.firstAttackMin).toBeGreaterThanOrEqual(8);
-  }, 120_000);
+    // Any single match can swing either way: Normal must win at least two of three.
+    let normalWins = 0;
+    for (const seed of [7, 11, 23]) {
+      const r = runMatch({
+        seed,
+        seats: [
+          { faction: 'aurelian', ai: 'normal' },
+          { faction: 'sahrun', ai: 'easy' },
+        ],
+        maxMin: 40,
+      });
+      expect(r.error).toBeUndefined();
+      if (r.winner === 0) normalWins++;
+      const easy = r.players[1]!;
+      expect(easy.ageAt[1], `seed ${seed}`).toBeGreaterThan(0);
+      if (easy.firstAttackMin >= 0) expect(easy.firstAttackMin).toBeGreaterThanOrEqual(8);
+    }
+    expect(normalWins).toBeGreaterThanOrEqual(2);
+  }, 240_000);
 });

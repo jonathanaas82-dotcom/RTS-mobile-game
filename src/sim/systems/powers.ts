@@ -154,11 +154,11 @@ export function powerEffectsSystem(world: World): void {
       if (fx.kind === 'slow') {
         for (const e of inArea(world, fx.x, fx.y, fx.radius, enemy))
           if (e.kind === 'unit') e.slowUntil = tick + 3;
-        continue;
+        if (fx.amount <= 0) continue;
       }
       if ((tick - fx.started) % EFFECT_PERIOD !== 0) continue;
       const share = (fx.amount * EFFECT_PERIOD) / TPS;
-      if (fx.kind === 'dot' || (fx.kind === 'freeze' && fx.amount > 0)) {
+      if (fx.kind === 'dot' || ((fx.kind === 'freeze' || fx.kind === 'slow') && fx.amount > 0)) {
         for (const e of inArea(world, fx.x, fx.y, fx.radius, enemy)) {
           const amt = share * (e.kind === 'building' ? fx.vsBuildings : 1);
           if (amt > 0)

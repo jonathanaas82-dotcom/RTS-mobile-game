@@ -15,6 +15,8 @@ export const FACTION_IDS = FACTIONS.map((f) => f.id) as FactionId[];
 export interface Seat {
   faction: FactionId;
   ai: Difficulty;
+  /** Major god (default: alternates with seed and seat). */
+  god?: string;
 }
 
 export interface HealthIssue {
@@ -41,6 +43,8 @@ export interface PlayerReport {
   snap: Array<[number, number, number]>;
   /** Minute the first building of each type was completed. */
   firstBuilt: Record<string, number>;
+  /** God powers cast, by id. */
+  casts: Record<string, number>;
 }
 
 export interface MatchResult {
@@ -79,13 +83,14 @@ interface Tracker {
   hallRebuilt: number;
   snap: Array<[number, number, number]>;
   firstBuilt: Record<string, number>;
+  casts: Record<string, number>;
 }
 
 export function runMatch(o: RunOptions): MatchResult {
   const maxTicks = (o.maxMin ?? 45) * 60 * TPS;
   const players = o.seats.map((s, i) => {
     const f = FACTIONS.find((x) => x.id === s.faction)!;
-    return { faction: s.faction, majorGod: f.majorGods[(o.seed + i) % 2]!, ai: s.ai };
+    return { faction: s.faction, majorGod: s.god ?? f.majorGods[(o.seed + i) % 2]!, ai: s.ai };
   });
   const { sim } = createMatch({ seed: o.seed, mapSize: o.mapSize ?? 64, players });
   const w = sim.world;
@@ -106,6 +111,7 @@ export function runMatch(o: RunOptions): MatchResult {
     hallRebuilt: 0,
     snap: [],
     firstBuilt: {},
+    casts: {},
   }));
   const report = (pl: number, kind: string, since: number, detail: string): void => {
     const t = tr[pl]!;
@@ -117,7 +123,11 @@ export function runMatch(o: RunOptions): MatchResult {
   try {
     while (w.winner < 0 && w.tick < maxTicks) {
       sim.step();
-      sim.drainEvents();
+      for (const ev of sim.drainEvents())
+        if (ev.type === 'power') {
+          const c = tr[ev.owner]!.casts;
+          c[ev.power] = (c[ev.power] ?? 0) + 1;
+        }
       if (w.tick % TPS !== 0) continue;
       const min = w.tick / TPS / 60;
       for (let pl = 0; pl < w.players.length; pl++) {
@@ -216,6 +226,7 @@ export function runMatch(o: RunOptions): MatchResult {
       townHallRebuilt: t.hallRebuilt,
       snap: t.snap,
       firstBuilt: t.firstBuilt,
+      casts: t.casts,
     };
   });
   if (o.health) {

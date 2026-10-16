@@ -60,6 +60,22 @@ export class EntityRenderer {
     this.lines = scene.add.graphics().setDepth(9e4);
   }
 
+  private toForestEdge(world: World, e: Entity, x: number, y: number): [number, number] {
+    const w = world.map.width;
+    const tx = (e.order.tile % w) * TILE_PX;
+    const ty = Math.floor(e.order.tile / w) * TILE_PX;
+    // Nearest point of the tile (trunks stand in its lower part, so aim a little low).
+    const cx = Math.min(Math.max(x, tx + TILE_PX * 0.15), tx + TILE_PX * 0.85);
+    const cy = Math.min(Math.max(y, ty + TILE_PX * 0.45), ty + TILE_PX * 0.95);
+    const dx = cx - x;
+    const dy = cy - y;
+    const d = Math.hypot(dx, dy);
+    const keep = TILE_PX * 0.3;
+    if (d <= keep) return [x, y];
+    const k = Math.min(d - keep, TILE_PX * 0.7) / d;
+    return [x + dx * k, y + dy * k];
+  }
+
   /** World-pixel position of an entity at interpolation `alpha`. */
   static pos(e: Entity, alpha: number): [number, number] {
     return [(e.px + (e.x - e.px) * alpha) * TILE_PX, (e.py + (e.y - e.py) * alpha) * TILE_PX];
@@ -84,7 +100,7 @@ export class EntityRenderer {
     const tick = world.tick;
     for (const e of world.entities) {
       if (e.dead || e.inside >= 0) continue;
-      const [x, y] = EntityRenderer.pos(e, alpha);
+      let [x, y] = EntityRenderer.pos(e, alpha);
       // Cull off-screen entities entirely (cheap; keeps the scene graph small).
       if (
         x < viewRect.x - margin ||
@@ -106,6 +122,9 @@ export class EntityRenderer {
       v.seen = fn;
       const s = v.sprite;
       if (e.kind === 'unit') {
+        // Woodcutters work from up to a tile away (sim reach): draw them stepped up to the
+        // forest edge so the axe meets the trees.
+        if (anim?.act === 'chop') [x, y] = this.toForestEdge(world, e, x, y);
         const working = anim?.act != null;
         if (working && anim.frame !== v.workFrame) {
           if (anim.frame === 1) this.onWorkImpact?.(anim.act!, x, y, e.facing);

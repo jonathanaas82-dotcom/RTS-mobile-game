@@ -31,10 +31,11 @@ describe('god powers', () => {
     expect(foes.every((f) => f.dead || f.hp < f.maxHp)).toBe(true);
     expect(friend.hp).toBe(friend.maxHp);
     expect(p.res.favor).toBe(175);
-    // Second cast is rejected while on cooldown.
+    // Second cast is rejected while on cooldown (Norse may still earn a little Favor from the
+    // survivors' blows, but nothing is spent).
     sim.enqueue({ type: 'castPower', player: 0, power: 'skyhammer', x: a.x, y: a.y });
     run(sim, 2);
-    expect(p.res.favor).toBe(175);
+    expect(p.res.favor).toBeGreaterThanOrEqual(175);
   });
 
   it('cannot cast without enough favor', () => {

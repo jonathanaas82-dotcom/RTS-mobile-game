@@ -19,6 +19,8 @@ export const FACTIONS: FactionDef[] = [
       { stat: 'cost', mul: 0.9, classes: ['infantry'] },
       { stat: 'hp', mul: 1.15, classes: ['infantry'] },
       { stat: 'speed', mul: 1.05, classes: ['infantry', 'worker'] },
+      // Shipwrights and stave builders: the Norse were masters of timber.
+      { stat: 'gather', mul: 1.15, resource: 'wood' },
     ],
     majorGods: ['thunrak', 'veyla'],
     minorGods: { 1: ['hrodna', 'skarn'], 2: ['brakka', 'eldra'], 3: ['gorm', 'sigrun'] },
@@ -49,15 +51,14 @@ export const FACTIONS: FactionDef[] = [
     id: 'sahrun',
     name: { en: 'The Sahrun Dominion', nb: 'Sahrun-dominiet' },
     desc: {
-      en: 'Desert kingdom. Strong economy and sturdy buildings, slower military. Favor flows from monuments.',
-      nb: 'Ørkenrike. Sterk økonomi og solide bygninger, tregere militære. Gunst kommer fra monumenter.',
+      en: 'Desert kingdom. Sturdy buildings and great monuments, slower military. Favor flows from monuments.',
+      nb: 'Ørkenrike. Solide bygninger og store monumenter, tregere militære. Gunst kommer fra monumenter.',
     },
     favorMode: 'monuments',
     favorDesc: { en: 'Build Monuments for steady Favor.', nb: 'Bygg monumenter for jevn gunst.' },
     worker: 'toiler',
     bonuses: [
       { stat: 'hp', mul: 1.15, classes: ['building'] },
-      { stat: 'gather', mul: 1.05 },
       { stat: 'trainTime', mul: 1.05, classes: ['infantry', 'ranged', 'cavalry'] },
     ],
     majorGods: ['solenkh', 'merit_asha'],

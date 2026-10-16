@@ -24,14 +24,17 @@ export function findBuildSpot(
   const oy = Math.floor(cy - size / 2);
   const anchor = grid.nearestWalkable(cx, cy);
   const home = region || (anchor >= 0 ? grid.region(anchor % w, Math.floor(anchor / w)) : 0);
+  // Scan in the mirrored order in the lower-right half of the (point-symmetric) map, so both
+  // seats' AIs place buildings the same way relative to their base and the enemy.
+  const s = cx + cy > (w + world.map.height) / 2 ? -1 : 1;
   // Second pass (a crowded base): resources only need a one-tile gap.
   for (const relaxed of [false, true])
     for (let r = minR; r <= maxR; r++) {
-      for (let dy = -r; dy <= r; dy++) {
-        for (let dx = -r; dx <= r; dx++) {
-          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
-          const tx = ox + dx;
-          const ty = oy + dy;
+      for (let ky = -r; ky <= r; ky++) {
+        for (let kx = -r; kx <= r; kx++) {
+          if (Math.max(Math.abs(kx), Math.abs(ky)) !== r) continue;
+          const tx = ox + kx * s;
+          const ty = oy + ky * s;
           if (!grid.canPlace(tx, ty, size)) continue;
           if (!clearAround(world, tx, ty, size, relaxed)) continue;
           let explored = true;

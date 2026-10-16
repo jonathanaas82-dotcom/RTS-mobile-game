@@ -7,6 +7,7 @@
  *   node scripts/ai-lab.mjs factions [seeds] Normal vs Normal faction win rates
  *   node scripts/ai-lab.mjs health [seeds]   AI health check (all difficulties x factions)
  *   node scripts/ai-lab.mjs match a:fac b:fac seed   one match, JSON result
+ *   node scripts/ai-lab.mjs pair a:fac[:god] b:fac[:god] [seeds] one pairing, seats alternate
  *
  * seeds: comma list or a range like 1-8. Set JOBS to limit worker threads.
  */
@@ -205,6 +206,34 @@ function profile(res) {
   }
 }
 
+async function pair(a, b, seeds) {
+  const seat = (s) => {
+    const [ai, faction, god] = s.split(':');
+    return god ? { ai, faction, god } : { ai, faction };
+  };
+  const jobs = seeds.map((seed) => ({
+    seed,
+    seats: seed % 2 ? [seat(b), seat(a)] : [seat(a), seat(b)],
+    aSeat: seed % 2 ? 1 : 0,
+    maxMin: 45,
+  }));
+  const res = await runAll(jobs);
+  let aw = 0;
+  let bw = 0;
+  let mins = 0;
+  const seatWins = [0, 0];
+  res.forEach((r, i) => {
+    mins += r.minutes;
+    if (r.winner >= 0) seatWins[r.winner]++;
+    if (r.winner === jobs[i].aSeat) aw++;
+    else if (r.winner >= 0) bw++;
+  });
+  console.log(
+    `${a} vs ${b}: ${res.length} games, ${a} ${pct(aw, res.length)}, ${b} ${pct(bw, res.length)}, draws ${res.length - aw - bw}, avg ${(mins / res.length).toFixed(1)} min, seat0 ${seatWins[0]} seat1 ${seatWins[1]}`,
+  );
+  profile(res);
+}
+
 async function health(seeds) {
   const diffs = ['easy', 'normal', 'hard'];
   const jobs = [];
@@ -276,6 +305,7 @@ async function main() {
   if (mode === 'ladder') await ladder(parseSeeds(args[0], '1-4'));
   else if (mode === 'factions') await factions(parseSeeds(args[0], '21-28'), args[1] ?? 'normal');
   else if (mode === 'health') await health(parseSeeds(args[0], '1-4'));
+  else if (mode === 'pair') await pair(args[0], args[1], parseSeeds(args[2], '1-48'));
   else if (mode === 'match') {
     const seat = (s) => ({ ai: s.split(':')[0], faction: s.split(':')[1] });
     const [r] = await runAll([

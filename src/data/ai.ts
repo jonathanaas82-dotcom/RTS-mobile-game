@@ -17,6 +17,8 @@ export interface AIProfile {
   ageWorkers: [number, number, number, number];
   /** Minimum standing army (pop per match minute, capped at 40) kept while saving. */
   minArmyPerMin: number;
+  /** Army population the AI stops training at (keeps Easy's army beatable). */
+  maxArmyPop: number;
   /** Number of barracks/stables to build. */
   barracks: number;
   stables: number;
@@ -43,14 +45,15 @@ export interface AIProfile {
 export const AI_PROFILES: Record<'easy' | 'normal' | 'hard' | 'passive', AIProfile> = {
   easy: {
     thinkTicks: 40,
-    workers: [10, 14, 16, 16],
+    workers: [9, 12, 14, 14],
     firstAttackMin: 10,
     wavePop: 8,
     waveGrowth: 3,
     retreatAt: 0.25,
     maxAge: 2,
-    ageWorkers: [0, 10, 14, 99],
+    ageWorkers: [0, 9, 12, 99],
     minArmyPerMin: 0.6,
+    maxArmyPop: 16,
     barracks: 1,
     stables: 0,
     towers: 0,
@@ -71,6 +74,7 @@ export const AI_PROFILES: Record<'easy' | 'normal' | 'hard' | 'passive', AIProfi
     maxAge: 3,
     ageWorkers: [0, 13, 19, 23],
     minArmyPerMin: 1.4,
+    maxArmyPop: 200,
     barracks: 1,
     stables: 1,
     towers: 1,
@@ -91,6 +95,7 @@ export const AI_PROFILES: Record<'easy' | 'normal' | 'hard' | 'passive', AIProfi
     maxAge: 3,
     ageWorkers: [0, 14, 22, 27],
     minArmyPerMin: 1.4,
+    maxArmyPop: 200,
     barracks: 2,
     stables: 1,
     towers: 2,
@@ -111,6 +116,7 @@ export const AI_PROFILES: Record<'easy' | 'normal' | 'hard' | 'passive', AIProfi
     maxAge: 0,
     ageWorkers: [0, 99, 99, 99],
     minArmyPerMin: 0,
+    maxArmyPop: 0,
     barracks: 0,
     stables: 0,
     towers: 0,

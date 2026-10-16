@@ -789,6 +789,7 @@ export class AIController implements Controller {
     const w = this.world;
     const minutes = w.tick / TPS / 60;
     const armyPop = this.armyUnits().reduce((n, u) => n + unitDef(u.def).pop, 0);
+    if (armyPop >= this.profile.maxArmyPop) return;
     // Keep a minimum standing army even while saving (only half of it while saving for an age,
     // or armies traded in endless waves would starve the age advance forever) — more when
     // we've just been attacked.
@@ -947,9 +948,11 @@ export class AIController implements Controller {
       const style = this.style();
       // Waves grow, but late in a match (economies thinning out, gold running dry) the base wave
       // size is enough again — otherwise a winning side can sit at home until the time limit.
+      // Never wait for more than the army cap allows (Easy would stop attacking).
       const grown = Math.min(
         this.profile.wavePop + this.profile.waveGrowth * this.wavesSent,
         this.profile.wavePop * 2.2,
+        this.profile.maxArmyPop - 2,
       );
       const need = (minutes > 25 ? this.profile.wavePop : grown) * style.waveScale;
       if (minutes >= this.profile.firstAttackMin - style.attackEarlierMin && pop >= need) {
@@ -1217,10 +1220,15 @@ export class AIController implements Controller {
       switch (d.kind) {
         case 'strike':
         case 'dot':
-        case 'freeze':
-        case 'slow':
           target = this.bestEnemyCluster(d.radius, 3);
           break;
+        case 'freeze':
+        case 'slow': {
+          // Crowd control only pays off when our own soldiers are there to exploit it.
+          const c = this.bestEnemyCluster(d.radius, 3);
+          if (c && this.armyNear(c.x, c.y, d.radius + 4) >= 3) target = c;
+          break;
+        }
         case 'heal':
           target = this.hurtCluster(d.radius);
           break;
@@ -1276,7 +1284,9 @@ export class AIController implements Controller {
       for (const o of w.spatial.query(f.x, f.y, radius)) {
         if (o.owner === this.me) friendly++;
         else if (o.owner >= 0)
-          v += o.cls === 'hero' || o.cls === 'mythic' ? 3 : o.cls === 'worker' ? 0.5 : 1;
+          // Workers don't count: sniping gatherers with damage powers wrecked whole economies
+          // and made the strike gods dominant.
+          v += o.cls === 'hero' || o.cls === 'mythic' ? 3 : o.cls === 'worker' ? 0 : 1;
       }
       v -= friendly * 0.5;
       if (v > bestV) {
@@ -1287,10 +1297,17 @@ export class AIController implements Controller {
     return best ? { x: best.x, y: best.y } : null;
   }
 
+  private armyNear(x: number, y: number, radius: number): number {
+    let n = 0;
+    for (const o of this.world.spatial.query(x, y, radius))
+      if (o.owner === this.me && o.kind === 'unit' && o.cls !== 'worker' && !o.dead) n++;
+    return n;
+  }
+
   private hurtCluster(radius: number): { x: number; y: number } | null {
     const w = this.world;
     let best: Entity | null = null;
-    let bestMissing = 150;
+    let bestMissing = 80;
     for (const u of this.armyUnits()) {
       if (w.tick - u.lastHit > TPS * 3) continue;
       let missing = 0;
