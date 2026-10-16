@@ -60,19 +60,35 @@ export class EntityRenderer {
     this.lines = scene.add.graphics().setDepth(9e4);
   }
 
-  private toForestEdge(world: World, e: Entity, x: number, y: number): [number, number] {
-    const w = world.map.width;
-    const tx = (e.order.tile % w) * TILE_PX;
-    const ty = Math.floor(e.order.tile / w) * TILE_PX;
-    // Nearest point of the tile (trunks stand in its lower part, so aim a little low).
-    const cx = Math.min(Math.max(x, tx + TILE_PX * 0.15), tx + TILE_PX * 0.85);
-    const cy = Math.min(Math.max(y, ty + TILE_PX * 0.45), ty + TILE_PX * 0.95);
+  private toSource(world: World, e: Entity, x: number, y: number): [number, number] {
+    let rx: number;
+    let ry: number;
+    let size = 1;
+    if (e.order.tile >= 0) {
+      const w = world.map.width;
+      rx = e.order.tile % w;
+      ry = Math.floor(e.order.tile / w);
+    } else {
+      const t = world.byId.get(e.order.target);
+      if (!t) return [x, y];
+      rx = t.tileX;
+      ry = t.tileY;
+      size = t.size;
+    }
+    // Nearest point of the source, a little inset (trunks and rocks sit inside the footprint,
+    // and in its lower part).
+    const x0 = (rx + 0.15) * TILE_PX;
+    const x1 = (rx + size - 0.15) * TILE_PX;
+    const y0 = (ry + 0.45 * size) * TILE_PX;
+    const y1 = (ry + size - 0.05) * TILE_PX;
+    const cx = Math.min(Math.max(x, x0), x1);
+    const cy = Math.min(Math.max(y, y0), y1);
     const dx = cx - x;
     const dy = cy - y;
     const d = Math.hypot(dx, dy);
     const keep = TILE_PX * 0.3;
     if (d <= keep) return [x, y];
-    const k = Math.min(d - keep, TILE_PX * 0.7) / d;
+    const k = Math.min(d - keep, TILE_PX) / d;
     return [x + dx * k, y + dy * k];
   }
 
@@ -122,9 +138,10 @@ export class EntityRenderer {
       v.seen = fn;
       const s = v.sprite;
       if (e.kind === 'unit') {
-        // Woodcutters work from up to a tile away (sim reach): draw them stepped up to the
-        // forest edge so the axe meets the trees.
-        if (anim?.act === 'chop') [x, y] = this.toForestEdge(world, e, x, y);
+        // Gatherers work from up to a tile away (sim reach): draw woodcutters, miners and
+        // berry pickers stepped up to their source so the axe or pick meets it.
+        if (anim?.act === 'chop' || anim?.act === 'mine' || anim?.act === 'pick')
+          [x, y] = this.toSource(world, e, x, y);
         const working = anim?.act != null;
         if (working && anim.frame !== v.workFrame) {
           if (anim.frame === 1) this.onWorkImpact?.(anim.act!, x, y, e.facing);
