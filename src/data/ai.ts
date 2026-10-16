@@ -15,10 +15,14 @@ export interface AIProfile {
   maxAge: number;
   /** Minimum workers before each age advance (index = target age). */
   ageWorkers: [number, number, number, number];
+  /** Minimum standing army (pop per match minute, capped at 40) kept while saving. */
+  minArmyPerMin: number;
   /** Number of barracks/stables to build. */
   barracks: number;
   stables: number;
   towers: number;
+  /** Builds a siege workshop (and saves for it late in the match). */
+  siege: boolean;
   /** Probability (0–1) of using a god power when a good opportunity is seen. */
   powerUse: number;
   /** Use hero abilities and focus fire. */
@@ -46,9 +50,11 @@ export const AI_PROFILES: Record<'easy' | 'normal' | 'hard' | 'passive', AIProfi
     retreatAt: 0.25,
     maxAge: 2,
     ageWorkers: [0, 10, 14, 99],
+    minArmyPerMin: 0.6,
     barracks: 1,
     stables: 0,
     towers: 0,
+    siege: false,
     powerUse: 0.25,
     micro: false,
     techs: false,
@@ -57,16 +63,18 @@ export const AI_PROFILES: Record<'easy' | 'normal' | 'hard' | 'passive', AIProfi
   },
   normal: {
     thinkTicks: 20,
-    workers: [14, 20, 24, 26],
+    workers: [14, 22, 24, 26],
     firstAttackMin: 6.5,
     wavePop: 12,
     waveGrowth: 4,
     retreatAt: 0.3,
     maxAge: 3,
     ageWorkers: [0, 13, 19, 23],
+    minArmyPerMin: 1.4,
     barracks: 1,
     stables: 1,
     towers: 1,
+    siege: true,
     powerUse: 0.6,
     micro: true,
     techs: true,
@@ -82,9 +90,11 @@ export const AI_PROFILES: Record<'easy' | 'normal' | 'hard' | 'passive', AIProfi
     retreatAt: 0.35,
     maxAge: 3,
     ageWorkers: [0, 14, 22, 27],
+    minArmyPerMin: 1.4,
     barracks: 2,
     stables: 1,
     towers: 2,
+    siege: true,
     powerUse: 1,
     micro: true,
     techs: true,
@@ -100,9 +110,11 @@ export const AI_PROFILES: Record<'easy' | 'normal' | 'hard' | 'passive', AIProfi
     retreatAt: 0,
     maxAge: 0,
     ageWorkers: [0, 99, 99, 99],
+    minArmyPerMin: 0,
     barracks: 0,
     stables: 0,
     towers: 0,
+    siege: false,
     powerUse: 0,
     micro: false,
     techs: false,
@@ -124,10 +136,19 @@ export const AI_GATHER_SPLIT: Array<[number, number, number]> = [
  * Faction play style on top of the difficulty profile. Hrimfolk earn Favor only by fighting,
  * so their AI raids earlier with smaller waves (applied as offsets/multipliers).
  */
-export const AI_STYLE: Record<string, { attackEarlierMin: number; waveScale: number }> = {
-  hrimfolk: { attackEarlierMin: 1.25, waveScale: 0.8 },
-  aurelian: { attackEarlierMin: 0, waveScale: 1 },
-  sahrun: { attackEarlierMin: 0, waveScale: 1 },
+export interface AIStyle {
+  attackEarlierMin: number;
+  waveScale: number;
+  /** Share of the minimum standing army still produced while saving for an age (0–1). */
+  saveArmy: number;
+}
+
+export const DEFAULT_AI_STYLE: AIStyle = { attackEarlierMin: 0, waveScale: 1, saveArmy: 0.5 };
+
+export const AI_STYLE: Record<string, AIStyle> = {
+  hrimfolk: { attackEarlierMin: 1.25, waveScale: 0.8, saveArmy: 1 },
+  aurelian: { attackEarlierMin: 0, waveScale: 1, saveArmy: 0.7 },
+  sahrun: { attackEarlierMin: 0, waveScale: 1, saveArmy: 1 },
 };
 
 /** Base army mix weights per faction (before countering). */
