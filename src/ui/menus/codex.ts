@@ -14,10 +14,9 @@ import { strongAgainst, weakAgainst } from '../../data/counters';
 import { TRAITS } from '../../data/traits';
 import type { FactionId, GodDef, UnitClass, UnitDef } from '../../data/types';
 import { getLanguage, t, type TranslationKey } from '../../i18n';
-import { createCanvas } from '../../render/assets/procedural/draw';
+import { godPortrait } from '../godPortrait';
 import { drawUnit } from '../../render/assets/procedural/units';
 import { el, onPress } from '../hud/dom';
-import { GLYPH } from '../commandCard';
 
 /** What the codex is showing (kept by the menu between redraws). */
 export interface CodexState {
@@ -38,105 +37,6 @@ function unitPortrait(u: UnitDef): string {
     portraits.set(u.id, url);
   }
   return url;
-}
-
-/**
- * God medallion: a glowing disc in the colour of the god's power with rays, and the god's
- * avatar on it — the mythic creature they grant, or the faction's hero for major gods.
- */
-function godPortrait(g: GodDef): string {
-  const key = `god:${g.id}`;
-  let url = portraits.get(key);
-  if (url) return url;
-  const S = 180;
-  const [cv, c] = createCanvas(S, S);
-  const color = powerDef(g.power).color;
-  const bg = c.createRadialGradient(S / 2, S * 0.42, 6, S / 2, S / 2, S / 2);
-  bg.addColorStop(0, '#fff6dc');
-  bg.addColorStop(0.25, color);
-  bg.addColorStop(1, '#120e16');
-  c.fillStyle = bg;
-  c.beginPath();
-  c.arc(S / 2, S / 2, S / 2 - 6, 0, Math.PI * 2);
-  c.fill();
-  c.save();
-  c.globalCompositeOperation = 'lighter';
-  c.fillStyle = 'rgba(255,240,200,0.08)';
-  for (let i = 0; i < 12; i++) {
-    const a = (i / 12) * Math.PI * 2;
-    c.beginPath();
-    c.moveTo(S / 2, S * 0.42);
-    c.lineTo(S / 2 + Math.cos(a - 0.09) * S, S * 0.42 + Math.sin(a - 0.09) * S);
-    c.lineTo(S / 2 + Math.cos(a + 0.09) * S, S * 0.42 + Math.sin(a + 0.09) * S);
-    c.closePath();
-    c.fill();
-  }
-  c.restore();
-  // The god's power glyph, large and faint behind the avatar (tells similar gods apart).
-  const pk = powerDef(g.power).kind;
-  c.save();
-  c.translate(S * 0.12, S * 0.1);
-  c.scale((S * 0.76) / 24, (S * 0.76) / 24);
-  c.globalAlpha = 0.28;
-  c.strokeStyle = '#fff6dc';
-  c.fillStyle = '#fff6dc';
-  c.lineWidth = 1.6;
-  const path = new Path2D(GLYPH[pk]);
-  if (pk === 'freeze' || pk === 'slow') c.stroke(path);
-  else c.fill(path);
-  c.restore();
-  const avatar = g.mythic
-    ? unitDef(g.mythic)
-    : (UNITS.find((u) => u.faction === g.faction && u.cls === 'hero') ?? UNITS[0]!);
-  const art = drawUnit(avatar, TEAM);
-  const k = (S * 0.92) / art.width;
-  c.save();
-  c.beginPath();
-  c.arc(S / 2, S / 2, S / 2 - 6, 0, Math.PI * 2);
-  c.clip();
-  c.drawImage(
-    art,
-    S / 2 - (art.width * k) / 2,
-    S * 0.9 - art.height * k * 0.86,
-    art.width * k,
-    art.height * k,
-  );
-  c.restore();
-  c.lineWidth = 6;
-  const ring = c.createLinearGradient(0, 0, 0, S);
-  ring.addColorStop(0, '#fff1b8');
-  ring.addColorStop(0.5, '#c9a24a');
-  ring.addColorStop(1, '#7a5418');
-  c.strokeStyle = ring;
-  c.beginPath();
-  c.arc(S / 2, S / 2, S / 2 - 4, 0, Math.PI * 2);
-  c.stroke();
-  // Badge with the power glyph at the lower right.
-  const bx = S * 0.82;
-  const by = S * 0.82;
-  c.fillStyle = color;
-  c.strokeStyle = '#2b2116';
-  c.lineWidth = 3;
-  c.beginPath();
-  c.arc(bx, by, S * 0.13, 0, Math.PI * 2);
-  c.fill();
-  c.stroke();
-  c.save();
-  c.translate(bx - S * 0.085, by - S * 0.085);
-  c.scale((S * 0.17) / 24, (S * 0.17) / 24);
-  c.fillStyle = '#2b2116';
-  c.strokeStyle = '#2b2116';
-  c.lineWidth = 2.2;
-  if (pk === 'freeze' || pk === 'slow') c.stroke(path2(pk));
-  else c.fill(path2(pk));
-  c.restore();
-  url = cv.toDataURL();
-  portraits.set(key, url);
-  return url;
-}
-
-function path2(kind: keyof typeof GLYPH): Path2D {
-  return new Path2D(GLYPH[kind]);
 }
 
 const clsName = (c: UnitClass): string => t(`cls.${c}` as TranslationKey);
