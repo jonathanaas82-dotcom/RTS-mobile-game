@@ -110,8 +110,8 @@ export const GODS: GodDef[] = [
     faction: 'hrimfolk',
     age: 3,
     desc: {
-      en: 'Rides to battle and chooses half the slain for her hall. Heroes +20% damage. Unlocks the Fire Giant.',
-      nb: 'Rir til strid og velger halvparten av de falne til sin hall. Helter +20 % skade. Låser opp Ildjotun.',
+      en: 'Rides to battle and chooses half the slain for her hall. Heroes +20% damage. Unlocks Hildisvíni, her battle-swine.',
+      nb: 'Rir til strid og velger halvparten av de falne til sin hall. Helter +20 % skade. Låser opp Hildesvin, kampgalten hennes.',
     },
     bonuses: [{ stat: 'damage', mul: 1.2, classes: ['hero'] }],
     power: 'tempest',

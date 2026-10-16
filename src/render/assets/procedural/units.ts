@@ -3082,7 +3082,6 @@ function shard(c: Ctx, x: number, y: number, len: number, w: number, a: number, 
 function giant(c: Ctx, def: UnitDef, team: string): void {
   const b = def.art.body;
   const a = def.art.accent ?? shade(b, 1.4);
-  const ember = def.id === 'cinder_colossus';
   // Legs with knee plates and toes.
   for (const [x, col] of [
     [32, shade(b, 0.65)],
@@ -3118,39 +3117,7 @@ function giant(c: Ctx, def: UnitDef, team: string): void {
   c.lineTo(58, 50);
   c.stroke();
   oval(c, 42, 30, 9, 3.5, 'rgba(255,255,255,0.18)', -0.2);
-  if (ember) {
-    // Molten cracks glowing through the rock.
-    glowCrack(
-      c,
-      [
-        [36, 30],
-        [41, 37],
-        [38, 45],
-        [44, 54],
-      ],
-      a,
-    );
-    glowCrack(
-      c,
-      [
-        [63, 29],
-        [58, 36],
-        [64, 44],
-        [60, 52],
-      ],
-      a,
-    );
-    glowCrack(
-      c,
-      [
-        [48, 26],
-        [52, 32],
-        [50, 37],
-      ],
-      a,
-    );
-  }
-  // Crystalline/ember plates.
+  // Crystalline plates.
   for (const [x, y, r] of [
     [38, 36, 6],
     [58, 32, 5],
@@ -3167,7 +3134,7 @@ function giant(c: Ctx, def: UnitDef, team: string): void {
     c.fill();
     line(c, x - r * 0.5, y - r * 0.2, x, y - r * 0.8, 0.8, 'rgba(255,255,255,0.7)');
   }
-  // Shoulder shards / ember spikes.
+  // Shoulder shards.
   for (const [x, y, ang, len] of [
     [31, 27, -0.5, 10],
     [37, 23, -0.15, 8],
@@ -3176,7 +3143,7 @@ function giant(c: Ctx, def: UnitDef, team: string): void {
   ] as const)
     shard(c, x, y, len, 3, ang, a);
   // Fur loincloth with a team belt.
-  c.fillStyle = vgrad(c, 62, 74, ember ? '#3a2a24' : '#d8d4cc');
+  c.fillStyle = vgrad(c, 62, 74, '#d8d4cc');
   c.beginPath();
   c.moveTo(28, 63);
   c.lineTo(72, 63);
@@ -3185,13 +3152,13 @@ function giant(c: Ctx, def: UnitDef, team: string): void {
   c.fill();
   rr(c, 28, 58, 44, 8, 4, vgrad(c, 58, 66, team));
   disc(c, 50, 62, 3, rgrad(c, 50, 62, 3, GOLD));
-  // Head: brow ridge, glowing eyes, mouth and an icicle / ember beard.
+  // Head: brow ridge, glowing eyes, mouth and an icicle beard.
   disc(c, 50, 18, 12.5, INK);
   disc(c, 50, 18, 12, rgrad(c, 50, 18, 12, shade(b, 1.1)));
   line(c, 41, 13, 59, 13, 3, shade(b, 0.75));
   eye(c, 54, 16, 2.4, a);
   eye(c, 46, 16, 2.4, a);
-  c.fillStyle = ember ? a : shade(b, 0.4);
+  c.fillStyle = shade(b, 0.4);
   c.beginPath();
   c.moveTo(44, 23);
   c.lineTo(56, 23);
@@ -3201,7 +3168,7 @@ function giant(c: Ctx, def: UnitDef, team: string): void {
   c.fill();
   for (let i = 0; i < 5; i++) {
     const bx = 41 + i * 4.5;
-    c.fillStyle = ember ? (i % 2 ? '#ffb04a' : '#ff6a2a') : i % 2 ? '#f4fbff' : shade(a, 0.9);
+    c.fillStyle = i % 2 ? '#f4fbff' : shade(a, 0.9);
     c.beginPath();
     c.moveTo(bx - 2.2, 26);
     c.lineTo(bx + 2.2, 26);
@@ -3315,7 +3282,158 @@ function serpent(c: Ctx, def: UnitDef, team: string): void {
   line(c, 63, 37, 76, 37, 1, GOLD);
 }
 
+/**
+ * Hildisvíni, Freyja's battle-swine (Hyndluljóð): a huge war boar with a golden bristle crest,
+ * curling tusks and a rune-studded war harness. Faces right like the other beasts.
+ */
+function boar(c: Ctx, def: UnitDef, team: string): void {
+  const b = def.art.body;
+  const a = def.art.accent ?? GOLD;
+  const dark = shade(b, 0.62);
+  // Far legs (darker), short and stout with cloven hooves.
+  animalLeg(c, 30, 62, 21, 8, dark, true, 'hoof');
+  animalLeg(c, 66, 62, 21, 8, dark, false, 'hoof');
+  // Thin curled tail.
+  c.strokeStyle = INK;
+  c.lineWidth = 3;
+  c.beginPath();
+  c.moveTo(16, 52);
+  c.bezierCurveTo(6, 50, 8, 40, 13, 43);
+  c.stroke();
+  c.strokeStyle = shade(b, 0.85);
+  c.lineWidth = 1.8;
+  c.stroke();
+  // Barrel body: low rump, heavy humped shoulders.
+  const bodyPath = (): void => {
+    c.beginPath();
+    c.moveTo(16, 58);
+    c.bezierCurveTo(12, 44, 26, 36, 44, 36);
+    c.bezierCurveTo(56, 30, 72, 30, 80, 40);
+    c.bezierCurveTo(86, 48, 84, 66, 74, 72);
+    c.bezierCurveTo(56, 78, 30, 78, 20, 70);
+    c.closePath();
+  };
+  c.save();
+  c.translate(0, 0.8);
+  bodyPath();
+  c.fillStyle = INK;
+  c.fill();
+  c.restore();
+  bodyPath();
+  c.fillStyle = vgrad(c, 32, 78, b);
+  c.fill();
+  // Belly shade and coarse hair texture.
+  c.save();
+  bodyPath();
+  c.clip();
+  oval(c, 48, 76, 34, 9, 'rgba(10,6,0,0.22)');
+  c.restore();
+  furStrands(c, 22, 48, 74, 50, 16, 4, shade(b, 1.3));
+  furStrands(c, 24, 60, 72, 64, 12, 3.5, shade(b, 0.7));
+  // War harness: team saddle-cloth with tablet-woven edge and gold studs, a girth strap.
+  c.fillStyle = team;
+  c.beginPath();
+  c.moveTo(34, 38);
+  c.quadraticCurveTo(50, 33, 62, 36);
+  c.lineTo(64, 58);
+  c.quadraticCurveTo(48, 62, 34, 58);
+  c.closePath();
+  c.fill();
+  c.strokeStyle = shade(team, 0.55);
+  c.lineWidth = 1.2;
+  c.stroke();
+  line(c, 35, 56, 63, 56, 2.2, a);
+  for (let i = 0; i < 6; i++) disc(c, 37 + i * 5, 56, 0.9, shade(a, 0.6));
+  line(c, 46, 36, 46, 70, 2.6, LEATHER);
+  line(c, 46, 36, 46, 70, 0.8, shade(LEATHER, 1.4));
+  // Gilded bronze rune plaque on the cloth.
+  rr(c, 43, 42, 10, 9, 2, dgrad(c, 43, 42, 53, 51, a));
+  c.strokeStyle = '#5a3a10';
+  c.lineWidth = 0.9;
+  c.beginPath();
+  c.moveTo(48, 43.5);
+  c.lineTo(48, 49.5);
+  c.moveTo(48, 44);
+  c.lineTo(51, 46);
+  c.moveTo(48, 46);
+  c.lineTo(51, 48);
+  c.stroke();
+  // Golden bristle crest along the spine, tallest over the shoulders.
+  for (let i = 0; i < 14; i++) {
+    const t = i / 13;
+    const x = 24 + t * 54;
+    const y = 40 - Math.sin(t * Math.PI * 0.9) * 7 + (t > 0.85 ? (t - 0.85) * 30 : 0);
+    const len = 5 + Math.sin(t * Math.PI) * 7;
+    shard(c, x, y + 2, len, 1.6, -0.35 + t * 0.5, i % 2 ? a : shade(a, 1.15));
+  }
+  // Near legs.
+  animalLeg(c, 38, 64, 20, 9, shade(b, 0.9), true, 'hoof');
+  animalLeg(c, 72, 64, 20, 8.6, shade(b, 0.9), false, 'hoof');
+  // Head: long wedge with a flat snout disc, small ear, glowing eye.
+  const headPath = (): void => {
+    c.beginPath();
+    c.moveTo(74, 38);
+    c.quadraticCurveTo(86, 36, 94, 50);
+    c.lineTo(97, 58);
+    c.quadraticCurveTo(92, 66, 82, 66);
+    c.quadraticCurveTo(72, 64, 70, 54);
+    c.closePath();
+  };
+  c.save();
+  c.translate(0.6, 0.8);
+  headPath();
+  c.fillStyle = INK;
+  c.fill();
+  c.restore();
+  headPath();
+  c.fillStyle = rgrad(c, 82, 48, 16, b);
+  c.fill();
+  furStrands(c, 76, 42, 90, 48, 5, 3, shade(b, 1.35));
+  // Snout disc.
+  oval(c, 96, 57.5, 3.2, 4.6, shade(b, 0.55), -0.2);
+  oval(c, 96.3, 57.5, 2.3, 3.6, '#c98a7a', -0.2);
+  disc(c, 95.6, 56.2, 0.7, '#3a1a14');
+  disc(c, 96.6, 58.8, 0.7, '#3a1a14');
+  // Mouth line and curling ivory tusks.
+  line(c, 84, 62, 94, 61, 1, shade(b, 0.45));
+  for (const [x0, y0, x1, y1, w] of [
+    [88, 61.5, 86, 52, 2.4],
+    [91, 61, 90.5, 53.5, 1.9],
+  ] as const) {
+    c.strokeStyle = INK;
+    c.lineWidth = w + 1;
+    c.beginPath();
+    c.moveTo(x0, y0);
+    c.quadraticCurveTo(x0 + 4, (y0 + y1) / 2 + 2, x1, y1);
+    c.stroke();
+    c.strokeStyle = '#f4ead2';
+    c.lineWidth = w;
+    c.stroke();
+  }
+  // Ear and gilded brow plate.
+  c.fillStyle = shade(b, 0.75);
+  c.beginPath();
+  c.moveTo(74, 40);
+  c.lineTo(72, 28);
+  c.lineTo(80, 37);
+  c.closePath();
+  c.fill();
+  c.fillStyle = dgrad(c, 76, 38, 86, 46, a);
+  c.beginPath();
+  c.moveTo(76, 40);
+  c.quadraticCurveTo(83, 37, 88, 44);
+  c.lineTo(84, 47);
+  c.quadraticCurveTo(80, 43, 77, 45);
+  c.closePath();
+  c.fill();
+  eye(c, 84, 48.5, 1.8, '#ffcf5a');
+}
+
 function beast(c: Ctx, def: UnitDef, team: string): void {
+  if (def.id === 'cinder_colossus') {
+    boar(c, def, team);
+    return;
+  }
   const b = def.art.body;
   const a = def.art.accent ?? shade(b, 1.4);
   const hydra = def.id === 'hydrake';

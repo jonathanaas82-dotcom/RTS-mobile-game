@@ -358,10 +358,10 @@ export const UNITS: UnitDef[] = [
   },
   {
     id: 'cinder_colossus',
-    name: { en: 'Fire Giant', nb: 'Ildjotun' },
+    name: { en: 'Hildisvíni', nb: 'Hildesvin' },
     role: {
-      en: "Mythic: a son of Múspell from Surtr's burning realm, who will set the world ablaze at Ragnarök.",
-      nb: 'Mytisk: en av Muspells sønner fra Surts brennende rike, som skal sette verden i brann ved Ragnarok.',
+      en: "Mythic: Freyja's battle-swine, a golden-bristled war boar forged by dwarves, that gores through walls and gates.",
+      nb: 'Mytisk: Frøyas kampgalt, en gullbørstet villgalt smidd av dverger, som river ned murer og porter.',
     },
     faction: 'hrimfolk',
     cls: 'mythic',
@@ -378,7 +378,7 @@ export const UNITS: UnitDef[] = [
     trainedAt: 'temple',
     god: 'sigrun',
     traits: ['demolisher'],
-    art: { shape: 'giant', body: '#5a3a30', accent: '#ff8a3a', scale: 2.1 },
+    art: { shape: 'beast', body: '#6a4a36', accent: '#e8b830', scale: 1.9 },
   },
 
   // ───────────── Aurelian League (Mediterranean): balanced, strong heroes ─────────────
