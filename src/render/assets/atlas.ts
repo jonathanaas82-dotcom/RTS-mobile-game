@@ -51,6 +51,9 @@ export class AtlasBuilder {
       if (textures.exists(texKey)) textures.remove(texKey);
       const tex = textures.addCanvas(texKey, cv);
       if (!tex) throw new Error('atlas page failed');
+      // Sprites are drawn at 2x and scaled down: always sample smoothly (some devices default to
+      // nearest-neighbour when the renderer runs without antialiasing).
+      tex.setFilter(0);
       for (const p of placed) {
         tex.add(p.name, 0, p.x, p.y, p.canvas.width, p.canvas.height);
         lookup.set(p.name, texKey);
