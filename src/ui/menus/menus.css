@@ -368,7 +368,10 @@
 }
 
 .card-portrait.god {
-  padding: 8px;
+  width: calc(72px * var(--ui-scale));
+  height: calc(72px * var(--ui-scale));
+  background: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.55);
 }
 
 .card-text {

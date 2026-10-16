@@ -7,7 +7,7 @@ import { getLanguage, setLanguage, t, type Language } from '../../i18n';
 import { hashSeed } from '../../sim/core/rng';
 import type { Difficulty, MatchConfig } from '../../sim/world';
 import { drawUnit } from '../../render/assets/procedural/units';
-import { powerIcon } from '../commandCard';
+import { godPortrait } from '../godPortrait';
 import { el, onPress } from '../hud/dom';
 import { menuBackdrop } from './backdrop';
 import { renderCodex, type CodexState } from './codex';
@@ -215,7 +215,7 @@ export class Menus {
       c.type = 'button';
       const pw = powerDef(g.power);
       const img = el('img', 'card-portrait god', c);
-      img.src = powerIcon(pw.kind, pw.color);
+      img.src = godPortrait(g);
       img.alt = '';
       const tx = el('div', 'card-text', c);
       el('div', 'card-title', tx).textContent = `${loc(g.name, lang)} — ${loc(g.title, lang)}`;

@@ -14,7 +14,8 @@ import { spawnUnit } from '../../sim/world';
 import type { AIController } from '../../ai/AIController';
 import { canAdvance, nextAge } from '../../sim/rules';
 import type { SimEvent, World } from '../../sim/world';
-import { CommandCard, costText, denialText, powerIcon } from '../../ui/commandCard';
+import { CommandCard, costText, denialText } from '../../ui/commandCard';
+import { godPortrait } from '../../ui/godPortrait';
 import { GestureRecognizer, type GestureEvent } from '../../ui/input/gestures';
 import { MatchArt } from '../assets/matchArt';
 import { BUILDING_OVERHANG } from '../assets/procedural/buildings';
@@ -419,9 +420,7 @@ export class WorldScene extends Phaser.Scene {
             loc(d.desc, lang) +
             `\n${t('age.power')}: ${loc(powerDef(d.power).name, lang)}` +
             (chk.ok ? '' : `\n${denialText(chk)}`),
-          icon: d.mythic
-            ? this.art.icon(`u:${d.mythic}:${ME}`)
-            : powerIcon(powerDef(d.power).kind, powerDef(d.power).color),
+          icon: godPortrait(d),
           disabled: !chk.ok,
           onChoose: () => {
             this.issue({ type: 'advanceAge', player: ME, building: b.id, god: g });
