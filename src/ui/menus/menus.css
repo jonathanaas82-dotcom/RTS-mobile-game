@@ -859,17 +859,18 @@
 }
 
 .codex-stats {
+  /* One grid for all rows: labels and values size to the longest entry (e.g. "nærkamp"),
+     and every bar starts and ends at the same place. */
   display: grid;
-  gap: 4px;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 4px 8px;
   margin: 6px 0;
+  font-size: 0.78em;
 }
 
 .codex-stat {
-  display: grid;
-  grid-template-columns: 3.4em 1fr 3.2em;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.78em;
+  display: contents;
 }
 
 .codex-stat-label {
