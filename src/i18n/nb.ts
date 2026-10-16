@@ -184,9 +184,9 @@ export const nb: Partial<Record<TranslationKey, string>> = {
   'tut.train':
     'Trykk på høvdinggården og deretter på arbeiderportrettet for å trene en ny arbeider. Flere arbeidere gir sterkere økonomi.',
   'tut.barracks':
-    'Bygg en kaserne på samme måte som langhuset. Hold inne en knapp for å se hva den gjør.',
+    'Bygg en krigerhall (kaserne) på samme måte som langhuset. Hold inne en knapp for å se hva den gjør.',
   'tut.army':
-    'Velg kasernen og tren tre soldater. ▲ ▼ i valgpanelet viser hva hver enhet er sterk og svak mot.',
+    'Velg krigerhallen og tren tre soldater. ▲ ▼ i valgpanelet viser hva hver enhet er sterk og svak mot.',
   'tut.fight':
     'Plyndrere nærmer seg! Trykk hærknappen (til venstre) for å velge alle soldatene, og trykk så på en fiende for å angripe.',
   'tut.age':

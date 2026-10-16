@@ -43,6 +43,7 @@ export const BUILDINGS: BuildingDef[] = [
   {
     id: 'storehouse',
     name: { en: 'Storehouse', nb: 'Lagerhus' },
+    names: { hrimfolk: { en: 'Stabbur', nb: 'Stabbur' } },
     size: 2,
     hp: 600,
     armor: 0.1,
@@ -70,6 +71,7 @@ export const BUILDINGS: BuildingDef[] = [
   {
     id: 'barracks',
     name: { en: 'Barracks', nb: 'Kaserne' },
+    names: { hrimfolk: { en: 'Warrior Hall', nb: 'Krigerhall' } },
     size: 3,
     hp: 1100,
     armor: 0.2,
@@ -109,6 +111,7 @@ export const BUILDINGS: BuildingDef[] = [
   {
     id: 'tower',
     name: { en: 'Watchtower', nb: 'Vakttårn' },
+    names: { hrimfolk: { en: 'Beacon Tower', nb: 'Vardetårn' } },
     size: 2,
     hp: 900,
     armor: 0.35,
@@ -124,6 +127,7 @@ export const BUILDINGS: BuildingDef[] = [
   {
     id: 'workshop',
     name: { en: 'Siege Workshop', nb: 'Beleiringsverksted' },
+    names: { hrimfolk: { en: "Woodwrights' Yard", nb: 'Tømmerverksted' } },
     size: 3,
     hp: 1000,
     armor: 0.2,

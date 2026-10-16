@@ -6,7 +6,8 @@ describe('display names', () => {
     expect(loc(buildingName('house', 'hrimfolk'), 'en')).toBe('Longhouse');
     expect(loc(buildingName('temple', 'hrimfolk'), 'nb')).toBe('Hov');
     expect(loc(buildingName('house', 'aurelian'), 'en')).toBe('House');
-    expect(loc(buildingName('barracks', 'hrimfolk'), 'nb')).toBe('Kaserne');
+    expect(loc(buildingName('barracks', 'hrimfolk'), 'nb')).toBe('Krigerhall');
+    expect(loc(buildingName('stable', 'hrimfolk'), 'nb')).toBe('Stall');
     expect(loc(buildingName('town_hall'), 'en')).toBe('Town Hall');
   });
 

@@ -182,9 +182,9 @@ export const en = {
   'tut.train':
     "Tap your Chieftain's Hall, then tap the worker portrait to train a new worker. More workers mean a stronger economy.",
   'tut.barracks':
-    'Build a Barracks the same way you built the longhouse. Long-press any button to see what it does.',
+    'Build a Warrior Hall (barracks) the same way you built the longhouse. Long-press any button to see what it does.',
   'tut.army':
-    'Select the Barracks and train three soldiers. The ▲ ▼ hints in the selection panel show what each unit is strong and weak against.',
+    'Select the Warrior Hall and train three soldiers. The ▲ ▼ hints in the selection panel show what each unit is strong and weak against.',
   'tut.fight':
     'Raiders approach! Tap the army button (left) to select all soldiers, then tap an enemy to attack.',
   'tut.age':
