@@ -136,10 +136,16 @@ export function generateMap(size: number, seed: number): GameMap {
 
   // 4. Make sure the two bases are connected over walkable ground.
   ensureConnected(map, setSym);
+  const guaranteedCount = map.features.length;
 
   // 5. Extra resources in the canonical half (mirrored), only on reachable ground.
   placeExtras(map, rng, 'gold', MAPGEN.extraGoldMines, setSym);
   placeExtras(map, rng, 'berries', MAPGEN.extraBerryClusters, setSym);
+  // Berry clusters grow after their placement check, so they can seal a narrow corridor:
+  // drop the most recent extra features (mirrored pairs) until the bases connect again.
+  const guaranteed = guaranteedCount;
+  while (map.features.length > guaranteed && !basesConnected(map)) map.features.length -= 2;
+  ensureConnected(map, setSym);
 
   for (let i = 0; i < total; i++) {
     if (tiles[i] === Terrain.Forest) map.wood[i] = MAPGEN.woodPerTree;
@@ -343,6 +349,11 @@ export function floodReachable(
     }
   }
   return seen;
+}
+
+function basesConnected(map: GameMap): boolean {
+  const [s0, s1] = map.starts as [TilePoint, TilePoint];
+  return floodReachable(map, s0)[s1.y * map.width + s1.x] === 1;
 }
 
 function ensureConnected(map: GameMap, setSym: SetSym): void {

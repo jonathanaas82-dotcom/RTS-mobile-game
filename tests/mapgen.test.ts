@@ -112,4 +112,21 @@ describe('generateMap', () => {
     expect(counts[Terrain.Forest] / total).toBeGreaterThan(0.08);
     expect(counts[Terrain.Cliff] / total).toBeGreaterThan(0.01);
   });
+
+  it('always leaves a walking route between the two bases', () => {
+    // Seeds that used to be sealed off by extra resource clusters.
+    const cases: [number, number][] = [
+      [48, 73],
+      [48, 240],
+      [48, 271],
+      [64, 26],
+      [64, 182],
+    ];
+    for (let seed = 1; seed <= 40; seed++) cases.push([64, seed]);
+    for (const [size, seed] of cases) {
+      const m = generateMap(size, seed);
+      const [a, b] = m.starts;
+      expect(floodReachable(m, a!)[b!.y * m.width + b!.x], `${size}:${seed}`).toBe(1);
+    }
+  });
 });
