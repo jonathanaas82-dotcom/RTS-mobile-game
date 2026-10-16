@@ -220,7 +220,7 @@ export class WorldScene extends Phaser.Scene {
 
   /**
    * Screen-space polish (WebGL only): a warm, slightly richer colour grade on Medium/High and,
-   * on High, a gentle tilt-shift blur at the top and bottom edges for a miniature-diorama look.
+   * on High, a soft vignette.
    */
   private applyPostFX(): void {
     const cam = this.cameras.main;
@@ -228,8 +228,12 @@ export class WorldScene extends Phaser.Scene {
     if (this.renderer.type !== Phaser.WEBGL || !cam.postFX || q === 'low') return;
     cam.postFX.clear();
     const grade = cam.postFX.addColorMatrix();
-    grade.saturate(0.12);
-    grade.contrast(0.07, true);
+    grade.saturate(0.06);
+    grade.contrast(0.08, true);
+    // Warm the midtones slightly (sunny afternoon) without tinting the shadows.
+    grade.multiply([1.04, 0, 0, 0, 0, 0, 1.01, 0, 0, 0, 0, 0, 0.95, 0, 0, 0, 0, 0, 1, 0], true);
+    // A soft vignette frames the battlefield and draws the eye to the centre.
+    if (q === 'high') cam.postFX.addVignette(0.5, 0.5, 0.92, 0.18);
   }
 
   /** Drift and cross-fade the two ripple layers of each watery chunk (only when on screen). */

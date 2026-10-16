@@ -16,6 +16,24 @@ interface Bird {
   phase: number;
 }
 
+interface Mote {
+  img: Phaser.GameObjects.Image;
+  vx: number;
+  vy: number;
+  phase: number;
+}
+
+interface Leaf {
+  img: Phaser.GameObjects.Image;
+  x: number;
+  y0: number;
+  fall: number;
+  t: number;
+  life: number;
+  spin: number;
+  phase: number;
+}
+
 interface Butterfly {
   img: Phaser.GameObjects.Image;
   hx: number;
@@ -65,7 +83,55 @@ function makeCritterTextures(scene: Phaser.Scene): void {
   c.fillStyle = '#2a2018';
   c.fillRect(6.4, 2.5, 1.2, 8);
   scene.textures.addCanvas('butterfly', cv);
+  // A falling leaf (tinted per leaf) and a soft cloud shadow made of overlapping puffs.
+  {
+    const [lv, lc] = canvas(14, 9);
+    lc.fillStyle = '#ffffff';
+    lc.beginPath();
+    lc.moveTo(1, 4.5);
+    lc.quadraticCurveTo(7, -1.5, 13, 4.5);
+    lc.quadraticCurveTo(7, 10.5, 1, 4.5);
+    lc.fill();
+    lc.strokeStyle = 'rgba(0,0,0,0.35)';
+    lc.lineWidth = 0.8;
+    lc.beginPath();
+    lc.moveTo(1.5, 4.5);
+    lc.lineTo(12, 4.5);
+    lc.stroke();
+    scene.textures.addCanvas('leaf', lv);
+  }
+  {
+    const W = 320;
+    const H = 200;
+    const [cl, cc] = canvas(W, H);
+    let s = 11;
+    const rnd = (): number => {
+      s = (s * 16807) % 2147483647;
+      return s / 2147483647;
+    };
+    for (let k = 0; k < 14; k++) {
+      const x = W * (0.2 + rnd() * 0.6);
+      const y = H * (0.3 + rnd() * 0.4);
+      const r = 40 + rnd() * 45;
+      const g = cc.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, 'rgba(255,255,255,0.32)');
+      g.addColorStop(0.6, 'rgba(255,255,255,0.16)');
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      cc.fillStyle = g;
+      cc.fillRect(0, 0, W, H);
+    }
+    scene.textures.addCanvas('cloudShadow', cl);
+  }
 }
+
+function canvas(w: number, h: number): [HTMLCanvasElement, CanvasRenderingContext2D] {
+  const cv = document.createElement('canvas');
+  cv.width = w;
+  cv.height = h;
+  return [cv, cv.getContext('2d')!];
+}
+
+const LEAF_TINTS = [0x6f9a3a, 0x9ab846, 0xd8a03a, 0xc8642a, 0x7fae48];
 
 const BUTTERFLY_TINTS = [0xffd84a, 0xffffff, 0xff9ab8, 0x8ec8ff, 0xffa64d];
 
@@ -85,6 +151,10 @@ export class Ambience {
   private nextFlock = 4000;
   private readonly butterflies: Butterfly[] = [];
   private readonly land: number[] = [];
+  private readonly motes: Mote[] = [];
+  private readonly leaves: Leaf[] = [];
+  private readonly forest: number[] = [];
+  private nextLeaf = 0;
   enabled = true;
 
   constructor(scene: Phaser.Scene, world: World, quality: 'low' | 'medium' | 'high') {
@@ -94,23 +164,40 @@ export class Ambience {
     for (let i = 0; i < world.map.tiles.length; i++)
       if (world.map.tiles[i] === Terrain.Water) this.water.push(i);
     this.enabled = quality !== 'low';
+    makeCritterTextures(scene);
     const n = quality === 'high' ? 6 : 3;
     for (let i = 0; i < n; i++) {
       const img = scene.add
-        .image(Math.random() * this.mapW, Math.random() * this.mapH, 'soft')
-        .setTint(0x0b1a0e)
-        .setAlpha(0.2)
-        .setScale(
-          (8 + Math.random() * 7) * (TILE_PX / 128) * 2,
-          (5 + Math.random() * 4) * (TILE_PX / 128) * 2,
-        )
+        .image(Math.random() * this.mapW, Math.random() * this.mapH, 'cloudShadow')
+        .setTint(0x0a1830)
+        .setAlpha(0.5)
+        .setScale((4 + Math.random() * 3) * (TILE_PX / 128))
+        .setAngle(Math.random() * 40 - 20)
         .setDepth(4.9e5);
       img.setVisible(this.enabled);
       this.clouds.push({ img, speed: 0.012 + Math.random() * 0.01 });
     }
-    for (let i = 0; i < world.map.tiles.length; i++)
+    for (let i = 0; i < world.map.tiles.length; i++) {
       if (world.map.tiles[i] === Terrain.Grass) this.land.push(i);
-    makeCritterTextures(scene);
+      else if (world.map.tiles[i] === Terrain.Forest) this.forest.push(i);
+    }
+    // Sunlit pollen and dust motes drifting near the camera.
+    const motes = quality === 'high' ? 26 : 12;
+    for (let i = 0; i < motes; i++) {
+      const img = scene.add
+        .image(0, 0, 'spark')
+        .setTint(i % 3 ? 0xfff0b8 : 0xffffff)
+        .setBlendMode('ADD')
+        .setDepth(4.45e5)
+        .setScale(0.1 + Math.random() * 0.1)
+        .setVisible(false);
+      this.motes.push({
+        img,
+        vx: 0.004 + Math.random() * 0.01,
+        vy: -0.002 - Math.random() * 0.006,
+        phase: Math.random() * 6.28,
+      });
+    }
     if (quality === 'high')
       for (let i = 0; i < 7; i++) {
         const img = scene.add
@@ -143,6 +230,8 @@ export class Ambience {
       if (c.img.y - c.img.displayHeight / 2 > this.mapH) c.img.y = -c.img.displayHeight / 2;
     }
     const now = this.scene.time.now;
+    this.updateMotes(dt, view, now);
+    this.updateLeaves(dt, view, now, map);
     this.updateBirds(dt, view, now);
     this.updateButterflies(view, now, map);
     if (now < this.nextGlint || this.water.length === 0) return;
@@ -165,6 +254,71 @@ export class Ambience {
         onComplete: () => free.setVisible(false),
       });
       return;
+    }
+  }
+
+  /** Motes drift slowly with the breeze, twinkling; any that leave the view respawn inside it. */
+  private updateMotes(dt: number, view: Phaser.Geom.Rectangle, now: number): void {
+    const k = TILE_PX / 64;
+    for (const m of this.motes) {
+      const img = m.img;
+      if (!img.visible || !view.contains(img.x, img.y)) {
+        img.setPosition(view.x + Math.random() * view.width, view.y + Math.random() * view.height);
+        img.setVisible(true);
+      }
+      img.x += (m.vx + Math.sin(now * 0.0007 + m.phase) * 0.006) * dt * k;
+      img.y += (m.vy + Math.cos(now * 0.0009 + m.phase) * 0.004) * dt * k;
+      img.setAlpha(0.2 + 0.5 * Math.max(0, Math.sin(now * 0.0015 + m.phase)));
+    }
+  }
+
+  /** Now and then a leaf drifts down from a forest tree in view, tumbling and fading out. */
+  private updateLeaves(
+    dt: number,
+    view: Phaser.Geom.Rectangle,
+    now: number,
+    map: World['map'],
+  ): void {
+    if (now > this.nextLeaf && this.forest.length && this.leaves.length < 10) {
+      this.nextLeaf = now + 260;
+      for (let k = 0; k < 5; k++) {
+        const i = this.forest[Math.floor(Math.random() * this.forest.length)]!;
+        if (map.tiles[i] !== Terrain.Forest) continue;
+        const x = ((i % map.width) + Math.random()) * TILE_PX;
+        const y = (Math.floor(i / map.width) + Math.random() * 0.6) * TILE_PX;
+        if (!view.contains(x, y)) continue;
+        const img = this.scene.add
+          .image(x, y, 'leaf')
+          .setTint(LEAF_TINTS[Math.floor(Math.random() * LEAF_TINTS.length)]!)
+          .setDepth(y + TILE_PX)
+          .setScale(0.9);
+        this.leaves.push({
+          img,
+          x,
+          y0: y - TILE_PX * 0.9,
+          fall: TILE_PX * (1.1 + Math.random() * 0.6),
+          t: 0,
+          life: 3200 + Math.random() * 1800,
+          spin: (Math.random() - 0.5) * 0.01,
+          phase: Math.random() * 6.28,
+        });
+        break;
+      }
+    }
+    for (let i = this.leaves.length - 1; i >= 0; i--) {
+      const l = this.leaves[i]!;
+      l.t += dt;
+      const f = l.t / l.life;
+      if (f >= 1) {
+        l.img.destroy();
+        this.leaves.splice(i, 1);
+        continue;
+      }
+      const sway = Math.sin(l.t * 0.003 + l.phase);
+      l.img.setPosition(l.x + sway * 12 + f * 30, l.y0 + f * l.fall);
+      l.img.setRotation(sway * 0.9 + l.t * l.spin);
+      l.img.setScale(0.9 * (0.4 + 0.6 * Math.abs(Math.cos(l.t * 0.004 + l.phase))), 0.9);
+      l.img.setAlpha(Math.min(1, (1 - f) * 4, f * 8));
     }
   }
 

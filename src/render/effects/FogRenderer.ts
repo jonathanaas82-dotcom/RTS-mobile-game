@@ -20,6 +20,10 @@ export class FogRenderer {
   private readonly data: ImageData;
   private readonly mist: Float32Array;
   private readonly tileAlpha: Float32Array;
+  /** Blurred "still unexplored" field: its soft edge gets a light, cloud-bank fringe. */
+  private readonly unexplored: Float32Array;
+  /** Per-pixel cloud brightness (puffy light and dark patches in the fog). */
+  private readonly puff: Float32Array;
   private readonly w: number;
   private readonly h: number;
   private lastTick = -1;
@@ -31,16 +35,21 @@ export class FogRenderer {
     const tex = scene.textures.createCanvas('fog', this.w * RES, this.h * RES);
     if (!tex) throw new Error('fog texture');
     this.tex = tex;
-    tex.setFilter(1); // LINEAR: smooth fog edges when scaled up
+    tex.setFilter(0); // FilterMode.LINEAR (0): smooth fog edges when scaled up
     this.data = tex.context.createImageData(this.w * RES, this.h * RES);
     this.tileAlpha = new Float32Array(this.w * this.h);
     this.mist = new Float32Array(this.w * RES * this.h * RES);
+    this.unexplored = new Float32Array(this.w * this.h);
+    this.puff = new Float32Array(this.w * RES * this.h * RES);
     for (let y = 0; y < this.h * RES; y++) {
       for (let x = 0; x < this.w * RES; x++) {
         const n =
           valueNoise(x / (RES * 2.2), y / (RES * 2.2), 4242) * 0.7 +
-          valueNoise(x / RES, y / RES, 99) * 0.3;
+          valueNoise(x / (RES * 1.5), y / (RES * 1.5), 99) * 0.3;
         this.mist[y * this.w * RES + x] = 0.82 + n * 0.3;
+        this.puff[y * this.w * RES + x] =
+          valueNoise(x / (RES * 3.2), y / (RES * 3.2), 777) * 0.65 +
+          valueNoise(x / (RES * 1.4), y / (RES * 1.4), 31) * 0.35;
       }
     }
     this.img = scene.add
@@ -62,7 +71,9 @@ export class FogRenderer {
     for (let i = 0; i < fog.length; i++) {
       const v = fog[i];
       this.tileAlpha[i] = v === 2 ? 0 : v === 1 ? ALPHA_EXPLORED : ALPHA_UNEXPLORED;
+      this.unexplored[i] = v === 0 ? 1 : 0;
     }
+    blur121(this.unexplored, w, h);
     // Two blur passes + linear sampling: soft gradients without per-tile plateaus.
     blur121(this.tileAlpha, w, h);
     blur121(this.tileAlpha, w, h);
@@ -70,6 +81,7 @@ export class FogRenderer {
     const W = w * RES;
     const H = h * RES;
     const ta = this.tileAlpha;
+    const ue = this.unexplored;
     for (let y = 0; y < H; y++) {
       const fy = Math.min(h - 1.001, Math.max(0, (y + 0.5) / RES - 0.5));
       const y0 = fy | 0;
@@ -86,15 +98,27 @@ export class FogRenderer {
         let alpha = (a + (b - a) * tx) * (1 - ty) + (c + (d - c) * tx) * ty;
         const p = y * W + x;
         alpha = Math.min(255, alpha * (this.mist[p] as number));
+        const ua = ue[i] as number;
+        const ub = ue[i + 1] as number;
+        const uc = ue[i + w] as number;
+        const ud = ue[i + w + 1] as number;
+        const un = (ua + (ub - ua) * tx) * (1 - ty) + (uc + (ud - uc) * tx) * ty;
+        // Puffy cloud tones inside, and a pale, sunlit fringe where the cloud bank thins out.
+        const pf = this.puff[p] as number;
+        const fringe = Math.max(0, 4 * un * (1 - un) - 0.25) * (0.5 + pf * 0.9);
+        const lift = (pf - 0.5) * 22 * un;
         const o = p * 4;
-        px[o] = 14;
-        px[o + 1] = 18;
-        px[o + 2] = 26;
+        px[o] = 16 + lift + fringe * 120;
+        px[o + 1] = 22 + lift + fringe * 128;
+        px[o + 2] = 34 + lift * 1.2 + fringe * 140;
         px[o + 3] = alpha;
       }
     }
     this.tex.context.putImageData(this.data, 0, 0);
     this.tex.refresh();
+    // Re-uploading resets the sampler to the renderer default (NEAREST when antialias is off,
+    // e.g. on high-DPI phones), which turns the soft mist into blocks: force LINEAR again.
+    this.tex.setFilter(0);
   }
 
   setVisible(v: boolean): void {
