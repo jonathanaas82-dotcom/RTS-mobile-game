@@ -13,9 +13,12 @@ export const CHUNK_TILES = 16;
 type RGB = [number, number, number];
 
 const C = {
-  grassLush: [62, 122, 50] as RGB,
-  grassMeadow: [118, 164, 70] as RGB,
-  grassDry: [166, 166, 84] as RGB,
+  grassLush: [54, 112, 46] as RGB,
+  grassMeadow: [108, 154, 62] as RGB,
+  grassDry: [160, 156, 78] as RGB,
+  grassCool: [46, 104, 72] as RGB,
+  grassWarm: [134, 160, 64] as RGB,
+  highland: [114, 134, 70] as RGB,
   earth: [138, 112, 78] as RGB,
   earthLight: [164, 138, 98] as RGB,
   forestFloor: [46, 78, 36] as RGB,
@@ -23,14 +26,82 @@ const C = {
   sand: [226, 204, 150] as RGB,
   sandDark: [196, 172, 122] as RGB,
   wetSand: [176, 152, 106] as RGB,
-  shallow: [64, 164, 176] as RGB,
-  deep: [22, 70, 120] as RGB,
+  shallow: [84, 182, 176] as RGB,
+  midWater: [38, 128, 156] as RGB,
+  deep: [20, 62, 112] as RGB,
   foam: [236, 246, 242] as RGB,
   rockLight: [196, 182, 158] as RGB,
   rockDark: [118, 106, 92] as RGB,
   rockFace: [112, 94, 78] as RGB,
   moss: [96, 136, 62] as RGB,
 };
+
+/** Side of the tileable painterly brush pattern (power of two). */
+const BRUSH = 256;
+let brushCache: Float32Array | null = null;
+
+/**
+ * A tileable field of short, curved brush strokes (values about -1..1): multiplied into the
+ * ground colours it gives grass a hand-painted, blade-like texture instead of smooth noise.
+ * Painted once with canvas strokes and read back.
+ */
+function brushPattern(): Float32Array {
+  if (brushCache) return brushCache;
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = BRUSH;
+  const c = cv.getContext('2d')!;
+  c.fillStyle = 'rgb(128,128,128)';
+  c.fillRect(0, 0, BRUSH, BRUSH);
+  let s = 0x2f6e2b1;
+  const rnd = (): number => {
+    s = Math.imul(s ^ (s >>> 15), 0x2c1b3c6d) + 0x9e3779b9;
+    s ^= s >>> 12;
+    return (s >>> 0) / 4294967296;
+  };
+  c.lineCap = 'round';
+  // Broad soft dabs first (painterly patches), then blades on top.
+  for (let i = 0; i < 260; i++) {
+    const x = rnd() * BRUSH;
+    const y = rnd() * BRUSH;
+    const g = 100 + rnd() * 56;
+    const rx = 5 + rnd() * 9;
+    const ry = rx * (0.4 + rnd() * 0.3);
+    const a = (rnd() - 0.5) * 0.9;
+    c.fillStyle = `rgba(${g},${g},${g},0.35)`;
+    for (const ox of [-BRUSH, 0, BRUSH])
+      for (const oy of [-BRUSH, 0, BRUSH]) {
+        if (Math.abs(x + ox - BRUSH / 2) > BRUSH / 2 + 16) continue;
+        if (Math.abs(y + oy - BRUSH / 2) > BRUSH / 2 + 16) continue;
+        c.beginPath();
+        c.ellipse(x + ox, y + oy, rx, ry, a, 0, Math.PI * 2);
+        c.fill();
+      }
+  }
+  for (let i = 0; i < 2600; i++) {
+    const x = rnd() * BRUSH;
+    const y = rnd() * BRUSH;
+    const len = 2.5 + rnd() * 5;
+    const lean = (rnd() - 0.5) * 2.4;
+    const light = rnd() < 0.5;
+    const g = light ? 150 + rnd() * 70 : 40 + rnd() * 60;
+    c.strokeStyle = `rgba(${g},${g},${g},${light ? 0.5 : 0.55})`;
+    c.lineWidth = 0.8 + rnd() * 0.9;
+    for (const ox of [-BRUSH, 0, BRUSH])
+      for (const oy of [-BRUSH, 0, BRUSH]) {
+        if (Math.abs(x + ox - BRUSH / 2) > BRUSH / 2 + 8) continue;
+        if (Math.abs(y + oy - BRUSH / 2) > BRUSH / 2 + 8) continue;
+        c.beginPath();
+        c.moveTo(x + ox, y + oy);
+        c.quadraticCurveTo(x + ox + lean * 0.2, y + oy - len * 0.6, x + ox + lean, y + oy - len);
+        c.stroke();
+      }
+  }
+  const d = c.getImageData(0, 0, BRUSH, BRUSH).data;
+  const out = new Float32Array(BRUSH * BRUSH);
+  for (let i = 0; i < out.length; i++) out[i] = ((d[i * 4] as number) - 128) / 100;
+  brushCache = out;
+  return out;
+}
 
 function smooth(e0: number, e1: number, x: number): number {
   const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
@@ -195,6 +266,63 @@ class FnGrid {
   }
 }
 
+/** Like FnGrid, but for RGB colours. */
+class RGBGrid {
+  private readonly v: Float32Array;
+  private readonly gw: number;
+  private readonly gh: number;
+  constructor(
+    w: number,
+    h: number,
+    private readonly perTile: number,
+    fn: (u: number, v: number, o: { r: number; g: number; b: number }) => void,
+  ) {
+    this.gw = w * perTile + 2;
+    this.gh = h * perTile + 2;
+    this.v = new Float32Array(this.gw * this.gh * 3);
+    const o = { r: 0, g: 0, b: 0 };
+    for (let y = 0; y < this.gh; y++)
+      for (let x = 0; x < this.gw; x++) {
+        fn(x / perTile, y / perTile, o);
+        const i = (y * this.gw + x) * 3;
+        this.v[i] = o.r;
+        this.v[i + 1] = o.g;
+        this.v[i + 2] = o.b;
+      }
+  }
+
+  at(u: number, v: number, out: { r: number; g: number; b: number }): void {
+    const x = Math.min(this.gw - 1.001, Math.max(0, u * this.perTile));
+    const y = Math.min(this.gh - 1.001, Math.max(0, v * this.perTile));
+    const x0 = x | 0;
+    const y0 = y | 0;
+    const fx = x - x0;
+    const fy = y - y0;
+    const a = (y0 * this.gw + x0) * 3;
+    const c = a + this.gw * 3;
+    const d = this.v;
+    const w00 = (1 - fx) * (1 - fy);
+    const w10 = fx * (1 - fy);
+    const w01 = (1 - fx) * fy;
+    const w11 = fx * fy;
+    out.r =
+      (d[a] as number) * w00 +
+      (d[a + 3] as number) * w10 +
+      (d[c] as number) * w01 +
+      (d[c + 3] as number) * w11;
+    out.g =
+      (d[a + 1] as number) * w00 +
+      (d[a + 4] as number) * w10 +
+      (d[c + 1] as number) * w01 +
+      (d[c + 4] as number) * w11;
+    out.b =
+      (d[a + 2] as number) * w00 +
+      (d[a + 5] as number) * w10 +
+      (d[c + 2] as number) * w01 +
+      (d[c + 5] as number) * w11;
+  }
+}
+
 export function paintGround(map: GameMap): GroundChunk[] {
   const w = map.width;
   const h = map.height;
@@ -220,6 +348,35 @@ export function paintGround(map: GameMap): GroundChunk[] {
     [0.4, 1],
     [0.16, 0.6],
   ]);
+  // Medium-scale clumps: tall dark grass tussocks and sun-bleached patches.
+  const clump = new NoiseGrid(w, h, 3, seed ^ 0x6a6a, [
+    [1.1, 1],
+    [0.45, 0.45],
+  ]);
+  // Base grass colour (moisture, dryness, cool/warm patches, tussocks, sunny clearings) depends
+  // only on smooth fields, so it is computed on a lattice and sampled bilinearly per pixel.
+  const grass = new RGBGrid(w, h, 3, (u, v, o) => {
+    const mo = moist.at(u, v);
+    const col = color.at(u, v);
+    const cl = clump.at(u, v);
+    o.r = C.grassMeadow[0];
+    o.g = C.grassMeadow[1];
+    o.b = C.grassMeadow[2];
+    const mix = (c: RGB, t: number): void => {
+      o.r += (c[0] - o.r) * t;
+      o.g += (c[1] - o.g) * t;
+      o.b += (c[2] - o.b) * t;
+    };
+    mix(C.grassLush, smooth(0.35, 0.7, mo));
+    mix(C.grassDry, smooth(0.6, 0.85, col) * (1 - smooth(0.4, 0.7, mo)) * 0.7);
+    mix(C.grassCool, smooth(0.5, 0.25, col) * 0.35);
+    mix(C.grassWarm, smooth(0.55, 0.8, col) * smooth(0.3, 0.6, mo) * 0.35);
+    const tall = smooth(0.6, 0.72, cl);
+    o.r *= 1 - tall * 0.2;
+    o.g *= 1 - tall * 0.12;
+    o.b *= 1 - tall * 0.1;
+    mix(C.grassWarm, smooth(0.36, 0.26, cl) * (1 - smooth(0.5, 0.75, mo)) * 0.3);
+  });
   // Rolling height: lit from the north-west, giving gentle hills and hollows.
   const height = new NoiseGrid(w, h, 2, seed ^ 0x2468, [
     [8, 1],
@@ -238,6 +395,28 @@ export function paintGround(map: GameMap): GroundChunk[] {
     for (const st of map.starts) best = Math.min(best, Math.hypot(u - st.x, v - st.y));
     const n = valueNoise(u / 1.7, v / 1.7, seed ^ 0x3131) * 2.4;
     return 1 - smooth(3.2, 5.6, best + n - 1.2);
+  });
+  // Footpaths worn from each base out to its nearby gold mines and berry patches; they wander a
+  // little (noise-displaced) and only show on open grass.
+  const segs: Array<[number, number, number, number]> = [];
+  for (const st of map.starts)
+    for (const f of map.features) {
+      if (f.kind === 'fish') continue;
+      const o = f.kind === 'gold' ? 1 : 0.5;
+      const d = Math.hypot(f.x + o - st.x, f.y + o - st.y);
+      if (d > 4 && d < 15) segs.push([st.x + 0.5, st.y + 0.5, f.x + o, f.y + o]);
+    }
+  const path = new FnGrid(w, h, 3, (u, v) => {
+    const pu = u + (valueNoise(u / 2.2, v / 2.2, seed ^ 0x7a7a) - 0.5) * 1.4;
+    const pv = v + (valueNoise(u / 2.2, v / 2.2, seed ^ 0x7b7b) - 0.5) * 1.4;
+    let best = 9;
+    for (const [x0, y0, x1, y1] of segs) {
+      const dx = x1 - x0;
+      const dy = y1 - y0;
+      const t = Math.max(0, Math.min(1, ((pu - x0) * dx + (pv - y0) * dy) / (dx * dx + dy * dy)));
+      best = Math.min(best, Math.hypot(pu - x0 - dx * t, pv - y0 - dy * t));
+    }
+    return 1 - smooth(0.1, 0.38, best);
   });
   // Tiles within 2 of a cliff / water / sand / forest: elsewhere those layers are skipped.
   const near = (pred: (t: number) => boolean, r = 2): Uint8Array => {
@@ -262,18 +441,29 @@ export function paintGround(map: GameMap): GroundChunk[] {
     for (let y = st.y - 8; y <= st.y + 8; y++)
       for (let x = st.x - 8; x <= st.x + 8; x++)
         if (x >= 0 && y >= 0 && x < w && y < h) nearBase[y * w + x] = 1;
+  // Tiles a footpath can reach (its wander is at most ~1.2 tiles off the straight line).
+  const nearPath = new Uint8Array(w * h);
+  for (const [x0, y0, x1, y1] of segs) {
+    const n = Math.ceil(Math.hypot(x1 - x0, y1 - y0) * 2);
+    for (let k = 0; k <= n; k++) {
+      const px = x0 + ((x1 - x0) * k) / n;
+      const py = y0 + ((y1 - y0) * k) / n;
+      for (let dy = -2; dy <= 2; dy++)
+        for (let dx = -2; dx <= 2; dx++) {
+          const tx = Math.floor(px) + dx;
+          const ty = Math.floor(py) + dy;
+          if (tx >= 0 && ty >= 0 && tx < w && ty < h) nearPath[ty * w + tx] = 1;
+        }
+    }
+  }
   const P = GROUND_PX;
+  const brush = brushPattern();
   const chunks: GroundChunk[] = [];
   const out = { r: 0, g: 0, b: 0 };
   const mixInto = (c: RGB, t: number): void => {
     out.r += (c[0] - out.r) * t;
     out.g += (c[1] - out.g) * t;
     out.b += (c[2] - out.b) * t;
-  };
-  const lerp3 = (a: RGB, b: RGB, t: number): void => {
-    out.r = a[0] + (b[0] - a[0]) * t;
-    out.g = a[1] + (b[1] - a[1]) * t;
-    out.b = a[2] + (b[2] - a[2]) * t;
   };
   for (let cy = 0; cy < h; cy += CHUNK_TILES) {
     for (let cx = 0; cx < w; cx += CHUNK_TILES) {
@@ -299,54 +489,73 @@ export function paintGround(map: GameMap): GroundChunk[] {
           // Pixel grain: cheap integer hash.
           let gh = Math.imul((pxx + cx * P) * 374761393 + (py + cy * P) * 668265263, 1274126177);
           gh = ((gh ^ (gh >>> 13)) >>> 0) / 4294967296 - 0.5;
-          // Grass: lush (moist) ↔ meadow ↔ dry, with clumpy fine texture.
-          lerp3(C.grassMeadow, C.grassLush, smooth(0.35, 0.7, mo));
-          mixInto(C.grassDry, smooth(0.6, 0.85, col) * (1 - smooth(0.4, 0.7, mo)) * 0.75);
-          const tex = 1 + dt * 0.22;
-          out.r *= tex;
-          out.g *= tex;
-          out.b *= tex;
-          // Bare-earth patches in the dry meadows, and the trampled ground around the bases.
-          const dirt = smooth(0.74, 0.84, col + dt * 0.25) * (1 - smooth(0.5, 0.7, mo));
-          const pz = nearBase[ti] ? plaza.at(u, v) : 0;
-          const earth = Math.max(dirt * 0.8, smooth(0.25, 0.75, pz + dt * 0.5) * 0.85);
-          if (earth > 0) {
-            const el = smooth(-0.15, 0.25, dt);
-            const ec: RGB = [
-              C.earth[0] + (C.earthLight[0] - C.earth[0]) * el,
-              C.earth[1] + (C.earthLight[1] - C.earth[1]) * el,
-              C.earth[2] + (C.earthLight[2] - C.earth[2]) * el,
-            ];
-            mixInto(ec, earth);
-          }
-          // Forest floor: dark moss with leaf litter.
-          const ff = nearForest[ti] ? smooth(0.32, 0.62, forest.at(u, v) + n * 0.35) : 0;
-          if (ff > 0) {
-            mixInto(C.forestFloor, ff * 0.92);
-            mixInto(C.leafLitter, ff * smooth(0, 0.3, dt) * 0.6);
-          }
-          // Beaches: sand tiles plus a band around all water.
+          // Painterly brush strokes (tileable pattern in global pixel space).
+          const gpx = cx * P + pxx - GROUND_PAD;
+          const gpy = cy * P + py - GROUND_PAD;
+          const br = brush[((gpy & (BRUSH - 1)) << 8) | (gpx & (BRUSH - 1))] as number;
           const wNear = nearWater[ti] === 1;
           const wv = wNear ? water.at(u, v) + n * 0.32 : 0;
-          const sd = wNear
-            ? Math.max(smooth(0.4, 0.6, sand.at(u, v) + n * 0.4), smooth(0.2, 0.42, wv))
-            : 0;
-          if (sd > 0) {
-            mixInto(C.sand, sd);
-            if (dt > 0.12) mixInto(C.sandDark, sd * 0.35);
-          }
-          if (wv > 0.36 && wv <= 0.5) mixInto(C.wetSand, smooth(0.36, 0.5, wv) * 0.8);
-          // Hill shading on land: warm light on the sunny slopes, cool shade in hollows.
-          const sh = shadeGrid.at(u, v);
-          const lk = 1 + sh * 0.24;
-          out.r *= lk + (sh > 0 ? sh * 0.04 : 0);
-          out.g *= lk;
-          out.b *= lk + (sh < 0 ? -sh * 0.06 : 0);
-          // Cliffs: a raised plateau (lit rim, turf, cracks) with a tall layered rock wall below
-          // its south edge, narrow side walls, and a long shadow cast to the south-east.
           const cNear = nearCliff[ti] === 1;
           const cv = cNear ? cliff.at(u, v) : 0;
           const cn = cNear ? cv + n * 0.3 : 0;
+          // Pixels fully under water or on a plateau top skip the land layers (painted over).
+          const land = wv < 0.535 && cn < 0.53;
+          if (!land) {
+            out.r = out.g = out.b = 0;
+          } else {
+            // Grass: lush (moist) ↔ meadow ↔ dry, with cool and sun-warmed patches.
+            grass.at(u, v, out);
+            // Light strokes lean warm/yellow, dark ones cool/blue: a hand-painted blade texture.
+            const tex = 1 + dt * 0.16;
+            out.r *= tex + br * 0.17;
+            out.g *= tex + br * 0.13;
+            out.b *= tex + br * 0.05;
+            // Bare-earth patches in the dry meadows, and the trampled ground around the bases.
+            const dirt = smooth(0.74, 0.84, col + dt * 0.25) * (1 - smooth(0.5, 0.7, mo));
+            const pz = nearBase[ti] ? plaza.at(u, v) : 0;
+            const pw = nearPath[ti] ? path.at(u, v) * smooth(-0.35, 0.15, dt + br * 0.25) : 0;
+            const earth = Math.max(dirt * 0.8, smooth(0.25, 0.75, pz + dt * 0.5) * 0.85, pw * 0.7);
+            if (earth > 0) {
+              const el = smooth(-0.15, 0.25, dt);
+              const ec: RGB = [
+                C.earth[0] + (C.earthLight[0] - C.earth[0]) * el,
+                C.earth[1] + (C.earthLight[1] - C.earth[1]) * el,
+                C.earth[2] + (C.earthLight[2] - C.earth[2]) * el,
+              ];
+              mixInto(ec, earth);
+            }
+            // Forest floor: dark moss with leaf litter; grass next to the trees lies in their shade.
+            const fo = nearForest[ti] ? forest.at(u, v) : 0;
+            const ff = fo > 0 ? smooth(0.32, 0.62, fo + n * 0.35) : 0;
+            if (fo > 0) {
+              const ao = 1 - smooth(0.04, 0.4, fo + n * 0.2) * 0.2;
+              out.r *= ao;
+              out.g *= ao;
+              out.b *= ao * 1.04;
+            }
+            if (ff > 0) {
+              mixInto(C.forestFloor, ff * 0.92);
+              mixInto(C.leafLitter, ff * smooth(0, 0.3, dt) * 0.6);
+            }
+            // Beaches: sand tiles plus a band around all water.
+            const sd = wNear
+              ? Math.max(smooth(0.4, 0.6, sand.at(u, v) + n * 0.4), smooth(0.2, 0.42, wv))
+              : 0;
+            if (sd > 0) {
+              mixInto(C.sand, sd);
+              if (dt > 0.12) mixInto(C.sandDark, sd * 0.35);
+            }
+            if (wv > 0.36 && wv <= 0.5) mixInto(C.wetSand, smooth(0.36, 0.5, wv) * 0.8);
+            else if (wv > 0.05 && sd < 0.5) mixInto(C.grassCool, smooth(0.05, 0.3, wv) * 0.3);
+            // Hill shading on land: warm light on the sunny slopes, cool shade in hollows.
+            const sh = shadeGrid.at(u, v);
+            const lk = 1 + sh * 0.24;
+            out.r *= lk + (sh > 0 ? sh * 0.04 : 0);
+            out.g *= lk;
+            out.b *= lk + (sh < 0 ? -sh * 0.06 : 0);
+          }
+          // Cliffs: a raised plateau (lit rim, turf, cracks) with a tall layered rock wall below
+          // its south edge, narrow side walls, and a long shadow cast to the south-east.
           if (cNear) {
             const shadow = cliff.at(u - 0.55, v - 1.5) - cv;
             if (shadow > 0) {
@@ -377,18 +586,35 @@ export function paintGround(map: GameMap): GroundChunk[] {
             let wallW = 0;
             if (d > 0) {
               const t = d / H; // 0 at the lip, 1 at the foot
-              // Horizontal strata with a slight wobble, vertical cracks, lit lip, dark foot.
+              // Weathered rock columns: each has a lit west face, a shaded east face and a dark
+              // crevice between, crossed by wobbly horizontal strata.
+              const cu = u * 2.3 + (edge.at(u * 0.6, v * 0.4) - 0.5) * 1.6 + t * 0.25;
+              const ci = Math.floor(cu);
+              const cf = cu - ci;
+              const colK = 0.88 + tileHash(ci, 7, 0x51) * 0.24;
+              const face =
+                1 +
+                (1 - smooth(0.0, 0.22, cf)) * 0.28 -
+                smooth(0.62, 0.92, cf) * 0.3 -
+                (1 - smooth(0.0, 0.05, cf)) * 0.35;
               const band = Math.sin((t * 4.4 + dt * 0.7 + Math.sin(u * 1.7) * 0.2) * Math.PI);
-              const crack = Math.abs(Math.sin(u * 9 + dt * 6 + t * 1.5));
-              let k = 1 + band * 0.1 + dt * 0.25;
-              k *= 1 - (1 - smooth(0.03, 0.12, crack)) * 0.3;
-              k *= 1.3 - t * 0.55; // light near the lip, occluded at the foot
+              let k = colK * face * (1 + band * 0.08 + dt * 0.3 + br * 0.06);
+              k *= 1.3 - t * 0.6; // light near the lip, occluded at the foot
               const lip = 1 - smooth(0.02, 0.12, t);
+              const warm = tileHash(ci, 3, 0x77) * 0.5 + 0.5;
               const wall: RGB = [
-                C.rockFace[0] * k + 40 * lip,
+                C.rockFace[0] * k * (0.96 + warm * 0.08) + 40 * lip,
                 C.rockFace[1] * k + 32 * lip,
-                C.rockFace[2] * k + 18 * lip,
+                C.rockFace[2] * k * (1.06 - warm * 0.08) + 18 * lip,
               ];
+              // Moss and grass hanging over the lip, ivy streaks running down some columns.
+              const drip =
+                (1 - smooth(0.06, 0.2 + tileHash(ci, 9, 0x33) * 0.35, t + dt * 0.3)) * 0.8;
+              if (drip > 0) {
+                wall[0] += (C.moss[0] * 0.8 - wall[0]) * drip;
+                wall[1] += (C.moss[1] * 0.85 - wall[1]) * drip;
+                wall[2] += (C.moss[2] * 0.8 - wall[2]) * drip;
+              }
               wallW = ground * (1 - smooth(0.9, 1, t));
               mixInto(wall, wallW);
               // Dark seam where the wall meets the ground.
@@ -426,21 +652,24 @@ export function paintGround(map: GameMap): GroundChunk[] {
             r[0] *= ck;
             r[1] *= ck;
             r[2] *= ck;
-            // Highland turf over the plateau interior; bare rock stays near the rim.
-            const moss = Math.min(
-              0.9,
-              smooth(0.45, 0.75, mo + dt * 0.4) * 0.45 + smooth(0.6, 0.85, cn + dt * 0.35) * 0.75,
-            );
+            // Highland turf over the plateau interior with rocky outcrops; bare rock at the rim.
+            const moss =
+              smooth(0.57, 0.72, cn + dt * 0.35 + (mo - 0.5) * 0.2) *
+              0.95 *
+              (1 - smooth(0.7, 0.8, col + dt * 0.5) * 0.55);
             if (moss > 0) {
-              r[0] += (C.moss[0] - r[0]) * moss;
-              r[1] += (C.moss[1] - r[1]) * moss;
-              r[2] += (C.moss[2] - r[2]) * moss;
+              const tk = 1 + br * 0.16 + dt * 0.15;
+              r[0] += (C.highland[0] * (tk + br * 0.03) - r[0]) * moss;
+              r[1] += (C.highland[1] * tk - r[1]) * moss;
+              r[2] += (C.highland[2] * (tk - br * 0.06) - r[2]) * moss;
             }
             // Edge lighting from the cliff field's slope: bright rim on north/west edges,
             // darker lip on south/east ones; the raised top catches a bit more sun overall.
             const gx = cliff.at(u + 0.15, v) - cliff.at(u - 0.15, v);
             const gy = cliff.at(u, v + 0.15) - cliff.at(u, v - 0.15);
-            const lit = 1.08 + Math.max(-0.35, Math.min(0.45, (gx + gy) * 1.6));
+            const lit =
+              (1.05 + Math.max(-0.35, Math.min(0.45, (gx + gy) * 1.6))) *
+              (1 - (1 - smooth(0.5, 0.57, cn)) * 0.28);
             r[0] *= lit;
             r[1] *= lit;
             r[2] *= lit;
@@ -448,16 +677,27 @@ export function paintGround(map: GameMap): GroundChunk[] {
           }
           // Water: depth gradient, caustic shimmer, foam line; the shore blends over a few pixels.
           if (wv > 0.45) {
-            const depth = smooth(0.5, 1.05, wv);
+            const depth = smooth(0.5, 1.05, wv + dt * 0.08);
             const caus = Math.abs(
               Math.sin((u * 3.1 + dt * 2.5) * 2.2) * Math.sin((v * 2.7 - dt * 2) * 2.4),
             );
-            const ck = 1 + (caus - 0.35) * 0.12 * (1 - depth * 0.7);
+            const ck = 1 + (caus - 0.35) * 0.2 * (1 - depth * 0.8);
+            // Shallow turquoise over a sandy bottom → teal → deep blue.
+            const d1 = Math.min(1, depth * 2);
+            const d2 = Math.max(0, depth * 2 - 1);
             const water: RGB = [
-              (C.shallow[0] + (C.deep[0] - C.shallow[0]) * depth) * ck,
-              (C.shallow[1] + (C.deep[1] - C.shallow[1]) * depth) * ck,
-              (C.shallow[2] + (C.deep[2] - C.shallow[2]) * depth) * ck,
+              (C.shallow[0] + (C.midWater[0] - C.shallow[0]) * d1) * ck,
+              (C.shallow[1] + (C.midWater[1] - C.shallow[1]) * d1) * ck,
+              (C.shallow[2] + (C.midWater[2] - C.shallow[2]) * d1) * ck,
             ];
+            water[0] += (C.deep[0] - water[0]) * d2;
+            water[1] += (C.deep[1] - water[1]) * d2;
+            water[2] += (C.deep[2] - water[2]) * d2;
+            // Sky reflection: a soft lighter sheen drifting across open water.
+            const sky = smooth(0.55, 0.9, col) * depth * 14;
+            water[0] += sky;
+            water[1] += sky;
+            water[2] += sky * 1.2;
             mixInto(water, smooth(0.465, 0.535, wv));
             const foam = smooth(0.475, 0.505, wv) * (1 - smooth(0.515, 0.565, wv));
             if (foam > 0) mixInto(C.foam, foam * 0.6);
@@ -535,8 +775,9 @@ function waveLayer(
       const crest = Math.pow(1 - Math.abs(Math.sin(phase)), 10);
       const open = smooth(0.56, 0.75, wv);
       // A second foam line a little off the shore (the wave coming in).
-      const shoreBand = Math.exp(-(((wv - (k ? 0.57 : 0.54)) / 0.018) ** 2));
-      const a = Math.min(1, crest * open * 0.55 + shoreBand * 0.7);
+      const shoreBand = Math.exp(-(((wv - (k ? 0.575 : 0.545)) / 0.024) ** 2));
+      // Fade in over the shore instead of a hard cut (no stair-stepped half-res edge).
+      const a = Math.min(1, crest * open * 0.55 + shoreBand * 0.7) * smooth(0.5, 0.54, wv);
       if (a < 0.02) continue;
       const o = (py * W + pxx) * 4;
       px[o] = 235;
@@ -578,6 +819,14 @@ function featureMask(map: GameMap): Uint8Array {
   }
   return m;
 }
+
+const FLOWERS: Array<[string, string]> = [
+  ['#ffe066', '#f6f2ea'],
+  ['#f6f2ea', '#c9a0ff'],
+  ['#e86a8a', '#ffd0dc'],
+  ['#8fb0ff', '#f6f2ea'],
+  ['#ffa94d', '#ffe066'],
+];
 
 let maskCache: { map: GameMap; mask: Uint8Array } | null = null;
 
@@ -628,32 +877,45 @@ function decorate(
       }
       const inPlaza = plaza.at(tx + 0.5, ty + 0.5) > 0.4;
       if (t === Terrain.Grass && !underWall) {
-        // Grass blades: short strokes, light tips over darker roots (texture, not speckle).
-        const blades = inPlaza ? 2 : 7;
-        for (let k = 0; k < blades; k++) {
-          const x = ox + 3 + r(k) * (P - 6);
-          const y = oy + 4 + r(k + 10) * (P - 6);
-          const lean = (r(k + 20) - 0.5) * 2.5;
-          c.strokeStyle = r(k + 30) > 0.45 ? 'rgba(178,214,110,0.32)' : 'rgba(40,78,30,0.28)';
-          c.lineWidth = 0.9;
-          c.beginPath();
-          c.moveTo(x, y);
-          c.quadraticCurveTo(x + lean * 0.3, y - 2, x + lean, y - 3.5 - r(k + 40) * 1.5);
-          c.stroke();
-        }
-        if (!inPlaza && r(30) < 0.09) {
-          // Flower cluster.
-          const colors = ['#ffe066', '#f6f2ea', '#e86a8a', '#9fb4ff', '#ffa94d'];
-          const col = colors[Math.floor(r(31) * colors.length)]!;
-          for (let k = 0; k < 5; k++) {
-            const fx = ox + 6 + r(32 + k) * (P - 12);
-            const fy = oy + 6 + r(40 + k) * (P - 12);
-            c.fillStyle = 'rgba(40,80,30,0.5)';
-            c.fillRect(fx - 0.3, fy, 0.7, 2.2);
-            c.fillStyle = col;
+        // Grass tufts: little clumps of blades, dark roots and sunlit tips (painterly texture).
+        const tufts = inPlaza ? 1 : 2;
+        for (let k = 0; k < tufts; k++) {
+          const x = ox + 4 + r(k) * (P - 8);
+          const y = oy + 6 + r(k + 10) * (P - 8);
+          const hgt = 3.5 + r(k + 40) * 2.5;
+          c.lineWidth = 1;
+          for (let b = 0; b < 4; b++) {
+            const lean = (b - 1.5) * 1.1 + (r(k + 20) - 0.5) * 1.5;
+            c.strokeStyle = b === 1 || b === 2 ? 'rgba(160,204,96,0.42)' : 'rgba(26,58,26,0.4)';
             c.beginPath();
-            c.arc(fx, fy, 1.15, 0, Math.PI * 2);
+            c.moveTo(x + (b - 1.5) * 0.7, y);
+            c.quadraticCurveTo(x + lean * 0.4, y - hgt * 0.6, x + lean, y - hgt + (b % 2) * 1.2);
+            c.stroke();
+          }
+        }
+        // Wildflower meadows in some regions, scattered clusters elsewhere.
+        const meadow = valueNoise(tx / 5, ty / 5, map.seed ^ 0x4e4e);
+        const clusters = inPlaza ? 0 : meadow > 0.82 ? 2 : meadow > 0.75 || r(30) < 0.04 ? 1 : 0;
+        if (clusters > 0) {
+          const pal = FLOWERS[Math.floor(valueNoise(tx / 3, ty / 3, map.seed ^ 0x1f1f) * 4.99)]!;
+          for (let q = 0; q < clusters; q++) {
+            const qx = ox + 7 + r(32 + q) * (P - 14);
+            const qy = oy + 8 + r(36 + q) * (P - 14);
+            // A leafy rosette under each tight bunch of blossoms.
+            c.fillStyle = 'rgba(38,84,30,0.45)';
+            c.beginPath();
+            c.ellipse(qx, qy + 1, 4.5, 2.6, 0, 0, Math.PI * 2);
             c.fill();
+            for (let k = 0; k < 5; k++) {
+              const fx = qx + (r(40 + q * 8 + k) - 0.5) * 7;
+              const fy = qy + (r(50 + q * 8 + k) - 0.5) * 4.5;
+              c.fillStyle = pal[k === 4 ? 1 : 0]!;
+              c.beginPath();
+              c.arc(fx, fy, 1.15 + r(60 + k) * 0.45, 0, Math.PI * 2);
+              c.fill();
+              c.fillStyle = 'rgba(255,250,220,0.85)';
+              c.fillRect(fx - 0.6, fy - 0.9, 0.7, 0.7);
+            }
           }
         }
         if (r(50) < (inPlaza ? 0.25 : 0.06)) pebbles(c, ox, oy, r);
@@ -719,7 +981,18 @@ function decorate(
         ].filter(([dx, dy]) => tileAt(tx + dx!, ty + dy!) !== Terrain.Water).length;
         if (shoreN > 0 && free && r(73) < 0.4)
           reeds(c, ox + P * (0.25 + r(74) * 0.5), oy + P * (0.3 + r(75) * 0.4), r);
-        else if (shoreN === 0 && r(70) < 0.07) {
+        else if (shoreN > 0 && free && r(73) < 0.55) {
+          // A mossy rock in the shallows with a ring of foam.
+          const rx = ox + P * (0.3 + r(76) * 0.4);
+          const ry = oy + P * (0.35 + r(77) * 0.3);
+          const rs = 2.6 + r(78) * 2;
+          c.strokeStyle = 'rgba(236,248,250,0.55)';
+          c.lineWidth = 1;
+          c.beginPath();
+          c.ellipse(rx, ry + rs * 0.35, rs * 1.5, rs * 0.75, 0, 0, Math.PI * 2);
+          c.stroke();
+          boulder(c, rx, ry, rs, r);
+        } else if (shoreN === 0 && r(70) < 0.07) {
           // Lily pad with a flower now and then.
           const lx = ox + 6 + r(71) * (P - 12);
           const ly = oy + 6 + r(72) * (P - 12);
