@@ -27,6 +27,8 @@ export class FogRenderer {
   private readonly w: number;
   private readonly h: number;
   private lastTick = -1;
+  /** Fog state at the last redraw: only the area around changed tiles is repainted. */
+  private readonly prev: Uint8Array;
 
   constructor(scene: Phaser.Scene, world: World) {
     this.w = world.map.width;
@@ -40,6 +42,7 @@ export class FogRenderer {
     this.tileAlpha = new Float32Array(this.w * this.h);
     this.mist = new Float32Array(this.w * RES * this.h * RES);
     this.unexplored = new Float32Array(this.w * this.h);
+    this.prev = new Uint8Array(this.w * this.h).fill(255);
     this.puff = new Float32Array(this.w * RES * this.h * RES);
     for (let y = 0; y < this.h * RES; y++) {
       for (let x = 0; x < this.w * RES; x++) {
@@ -68,6 +71,29 @@ export class FogRenderer {
     if (!fog) return;
     const w = this.w;
     const h = this.h;
+    // Bounding box of tiles whose visibility changed since the last redraw.
+    let minX = w;
+    let minY = h;
+    let maxX = -1;
+    let maxY = -1;
+    for (let i = 0; i < fog.length; i++) {
+      const v = fog[i] as number;
+      if (v === this.prev[i]) continue;
+      this.prev[i] = v;
+      const x = i % w;
+      const y = (i / w) | 0;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+    if (maxX < 0) return;
+    // The blurs spread a change two tiles and bilinear sampling reads one tile further.
+    const M = 3;
+    minX = Math.max(0, minX - M);
+    minY = Math.max(0, minY - M);
+    maxX = Math.min(w - 1, maxX + M);
+    maxY = Math.min(h - 1, maxY + M);
     for (let i = 0; i < fog.length; i++) {
       const v = fog[i];
       this.tileAlpha[i] = v === 2 ? 0 : v === 1 ? ALPHA_EXPLORED : ALPHA_UNEXPLORED;
@@ -79,14 +105,17 @@ export class FogRenderer {
     blur121(this.tileAlpha, w, h);
     const px = this.data.data;
     const W = w * RES;
-    const H = h * RES;
     const ta = this.tileAlpha;
     const ue = this.unexplored;
-    for (let y = 0; y < H; y++) {
+    const x0px = minX * RES;
+    const y0px = minY * RES;
+    const x1px = (maxX + 1) * RES;
+    const y1px = (maxY + 1) * RES;
+    for (let y = y0px; y < y1px; y++) {
       const fy = Math.min(h - 1.001, Math.max(0, (y + 0.5) / RES - 0.5));
       const y0 = fy | 0;
       const ty = fy - y0;
-      for (let x = 0; x < W; x++) {
+      for (let x = x0px; x < x1px; x++) {
         const fx = Math.min(w - 1.001, Math.max(0, (x + 0.5) / RES - 0.5));
         const x0 = fx | 0;
         const tx = fx - x0;
@@ -114,7 +143,7 @@ export class FogRenderer {
         px[o + 3] = alpha;
       }
     }
-    this.tex.context.putImageData(this.data, 0, 0);
+    this.tex.context.putImageData(this.data, 0, 0, x0px, y0px, x1px - x0px, y1px - y0px);
     this.tex.refresh();
     // Re-uploading resets the sampler to the renderer default (NEAREST when antialias is off,
     // e.g. on high-DPI phones), which turns the soft mist into blocks: force LINEAR again.

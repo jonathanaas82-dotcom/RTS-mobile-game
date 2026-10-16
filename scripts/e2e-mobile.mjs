@@ -31,6 +31,13 @@ try {
       'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0 Mobile Safari/537.36',
   });
   const page = await context.newPage();
+  // Headless Chromium renders on an emulated GPU that is fill-rate bound: at 2x render scale it
+  // manages only a few frames per second, too slow for timing-based gesture checks. Test on Low
+  // (1x render scale); real phone GPUs run High comfortably. E2E_GRAPHICS=high overrides.
+  await page.addInitScript((q) => {
+    if (!localStorage.getItem('godforge.settings.v1'))
+      localStorage.setItem('godforge.settings.v1', JSON.stringify({ graphics: q }));
+  }, process.env.E2E_GRAPHICS ?? 'low');
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
@@ -48,6 +55,14 @@ try {
   const tick = () =>
     page.evaluate(() => window.__godforge.game.scene.getScene('World').sim.world.tick);
 
+  // Warm-up: the first seconds after load paint ground chunks and compile shaders, which stalls
+  // frames on software-rendered headless browsers. Wait until the sim ticks steadily.
+  for (let i = 0, last = await tick(); i < 30; i++) {
+    await page.waitForTimeout(500);
+    const now = await tick();
+    if (now - last >= 7) break;
+    last = now;
+  }
   const t0 = await tick();
   await page.waitForTimeout(1000);
   const t1 = await tick();
